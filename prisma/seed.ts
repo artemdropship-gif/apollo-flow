@@ -13,6 +13,20 @@ const DEMO_EMAIL = "demo@apollo-flow.local";
 const DEMO_PASSWORD = "Demo123!";
 const DEMO_NAME = "Demo User";
 
+function daysAgo(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(10, 30, 0, 0);
+  return d;
+}
+
+const CONTACTED_STATUSES: LeadStatusValue[] = [
+  "CONTACTED",
+  "REPLIED",
+  "NEGOTIATION",
+  "CLIENT",
+];
+
 type LeadStatusValue =
   | "NEW"
   | "IN_PROGRESS"
@@ -73,6 +87,7 @@ async function main() {
     rating?: number;
     reviewsCount?: number;
     status: LeadStatusValue;
+    createdDaysAgo: number;
     score: ScoreInput;
   }> = [
     {
@@ -84,6 +99,7 @@ async function main() {
       rating: 4.6,
       reviewsCount: 12,
       status: "NEW",
+      createdDaysAgo: 1,
       score: { audit: emptyAudit(false), reviewsCount: 12, socialsActive: false },
     },
     {
@@ -95,6 +111,7 @@ async function main() {
       rating: 4.2,
       reviewsCount: 8,
       status: "IN_PROGRESS",
+      createdDaysAgo: 3,
       score: {
         audit: audit({
           outdatedDesign: true,
@@ -115,6 +132,7 @@ async function main() {
       rating: 4.9,
       reviewsCount: 240,
       status: "CONTACTED",
+      createdDaysAgo: 6,
       score: {
         audit: audit({
           hasForms: true,
@@ -136,6 +154,7 @@ async function main() {
       rating: 4.0,
       reviewsCount: 5,
       status: "REPLIED",
+      createdDaysAgo: 8,
       score: { audit: emptyAudit(true), reviewsCount: 5, socialsActive: false },
     },
     {
@@ -147,6 +166,7 @@ async function main() {
       rating: 4.7,
       reviewsCount: 64,
       status: "NEGOTIATION",
+      createdDaysAgo: 10,
       score: {
         audit: audit({
           notResponsive: true,
@@ -167,6 +187,7 @@ async function main() {
       rating: 4.8,
       reviewsCount: 130,
       status: "CLIENT",
+      createdDaysAgo: 12,
       score: {
         audit: audit({
           hasForms: true,
@@ -178,11 +199,129 @@ async function main() {
         socialsActive: true,
       },
     },
+    {
+      name: "Маникюрный салон «Ноготок»",
+      niche: "Маникюрный салон",
+      city: "Казань",
+      phone: "+7 900 000-00-07",
+      website: null,
+      rating: 4.3,
+      reviewsCount: 9,
+      status: "NEW",
+      createdDaysAgo: 0,
+      score: { audit: emptyAudit(false), reviewsCount: 9, socialsActive: false },
+    },
+    {
+      name: "Автосервис «Мотор»",
+      niche: "Автосервис",
+      city: "Казань",
+      phone: "+7 900 000-00-08",
+      website: "http://motor-old.example",
+      rating: 3.9,
+      reviewsCount: 18,
+      status: "NEW",
+      createdDaysAgo: 2,
+      score: {
+        audit: audit({ outdatedDesign: true, notResponsive: true }),
+        reviewsCount: 18,
+        socialsActive: false,
+      },
+    },
+    {
+      name: "Косметология «Идеал»",
+      niche: "Косметология",
+      city: "Казань",
+      phone: "+7 900 000-00-09",
+      website: "http://ideal-broken.example",
+      rating: 4.1,
+      reviewsCount: 22,
+      status: "IN_PROGRESS",
+      createdDaysAgo: 4,
+      score: { audit: emptyAudit(true), reviewsCount: 22, socialsActive: true },
+    },
+    {
+      name: "Пиццерия «Точка»",
+      niche: "Пиццерия",
+      city: "Казань",
+      phone: "+7 900 000-00-10",
+      website: "https://tochka-pizza.example",
+      rating: 4.5,
+      reviewsCount: 76,
+      status: "CONTACTED",
+      createdDaysAgo: 5,
+      score: {
+        audit: audit({ notResponsive: true, poorSeo: true, hasForms: true }),
+        reviewsCount: 76,
+        socialsActive: true,
+      },
+    },
+    {
+      name: "Юрист Соколова",
+      niche: "Юрист",
+      city: "Казань",
+      phone: "+7 900 000-00-11",
+      website: null,
+      rating: 4.8,
+      reviewsCount: 14,
+      status: "CONTACTED",
+      createdDaysAgo: 7,
+      score: { audit: emptyAudit(false), reviewsCount: 14, socialsActive: false },
+    },
+    {
+      name: "Детский центр «Радуга»",
+      niche: "Детский центр",
+      city: "Казань",
+      phone: "+7 900 000-00-12",
+      website: "http://raduga-old.example",
+      rating: 4.4,
+      reviewsCount: 31,
+      status: "REPLIED",
+      createdDaysAgo: 9,
+      score: {
+        audit: audit({ outdatedDesign: true, poorSeo: true }),
+        reviewsCount: 31,
+        socialsActive: true,
+      },
+    },
+    {
+      name: "SPA «Лагуна»",
+      niche: "SPA",
+      city: "Казань",
+      phone: "+7 900 000-00-13",
+      website: "https://laguna-spa.example",
+      rating: 4.9,
+      reviewsCount: 88,
+      status: "REJECTED",
+      createdDaysAgo: 11,
+      score: {
+        audit: audit({ modern: true, premium: true, hasForms: true, hasCta: true }),
+        reviewsCount: 88,
+        socialsActive: true,
+      },
+    },
+    {
+      name: "Магазин одежды «Стиль»",
+      niche: "Магазин одежды",
+      city: "Казань",
+      phone: "+7 900 000-00-14",
+      website: "http://stil-old.example",
+      rating: 4.0,
+      reviewsCount: 11,
+      status: "NEGOTIATION",
+      createdDaysAgo: 13,
+      score: {
+        audit: audit({ outdatedDesign: true, notResponsive: true, poorSeo: true }),
+        reviewsCount: 11,
+        socialsActive: false,
+      },
+    },
   ];
 
   for (const seed of leadSeeds) {
     const { score, reasons } = computeLeadScore(seed.score);
-    await prisma.lead.create({
+    const contacted = CONTACTED_STATUSES.includes(seed.status);
+    const createdAt = daysAgo(seed.createdDaysAgo);
+    const lead = await prisma.lead.create({
       data: {
         userId: user.id,
         projectId: project.id,
@@ -204,12 +343,24 @@ async function main() {
         aiAudit: seed.score.audit as unknown as Prisma.InputJsonValue,
         status: seed.status,
         favorite: seed.status === "NEGOTIATION",
-        contacted: ["CONTACTED", "REPLIED", "NEGOTIATION", "CLIENT"].includes(
-          seed.status,
-        ),
+        contacted,
         isClient: seed.status === "CLIENT",
+        createdAt,
       },
     });
+
+    if (contacted) {
+      // First touch a day after the lead was found (capped at today).
+      const sentAt = daysAgo(Math.max(seed.createdDaysAgo - 1, 0));
+      await prisma.contactMessage.create({
+        data: {
+          leadId: lead.id,
+          channel: "TELEGRAM",
+          content: `Здравствуйте! Посмотрел сайт «${seed.name}» — есть идеи, как получать больше заявок.`,
+          createdAt: sentAt,
+        },
+      });
+    }
   }
 
   await prisma.note.createMany({
