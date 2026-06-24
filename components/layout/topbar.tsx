@@ -22,7 +22,7 @@ export function Topbar() {
   const setOpen = useCommandStore((s) => s.setOpen);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background px-4">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-1 h-5" />
       <h1 className="text-sm font-semibold">{title}</h1>
