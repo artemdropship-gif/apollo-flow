@@ -26,8 +26,8 @@ export function PipelineBoard({ leads }: { leads: SavedLead[] }) {
     return map;
   }, [items]);
 
-  function handleDrop(status: LeadStatus) {
-    const id = dragId;
+  function handleDrop(event: React.DragEvent, status: LeadStatus) {
+    const id = event.dataTransfer.getData("text/plain") || dragId;
     setOverStatus(null);
     setDragId(null);
     if (!id) return;
@@ -83,26 +83,28 @@ export function PipelineBoard({ leads }: { leads: SavedLead[] }) {
                 );
               }
             }}
-            onDrop={() => handleDrop(column.value)}
+            onDrop={(event) => handleDrop(event, column.value)}
             className={cn(
-              "flex w-72 shrink-0 flex-col rounded-xl border border-border/60 bg-muted/30 transition-colors",
-              isOver && "border-primary/70 bg-primary/5",
+              "flex w-72 shrink-0 flex-col rounded-lg border border-border/70 bg-muted/20 transition-colors",
+              isOver && "border-foreground/30 bg-muted/50",
             )}
           >
-            <header className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5">
+            <header className="flex items-center justify-between gap-2 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <span
-                  className="size-2.5 rounded-full"
+                  className="size-2 rounded-full"
                   style={{ backgroundColor: column.color }}
                 />
-                <span className="text-sm font-medium">{column.label}</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {column.label}
+                </span>
               </div>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+              <span className="text-xs font-medium text-muted-foreground tabular-nums">
                 {cards.length}
               </span>
             </header>
 
-            <div className="flex min-h-32 flex-1 flex-col gap-2 p-2">
+            <div className="flex min-h-32 flex-1 flex-col gap-2 px-2 pb-2">
               {cards.map((lead) => (
                 <PipelineCard
                   key={lead.id}
@@ -113,8 +115,8 @@ export function PipelineBoard({ leads }: { leads: SavedLead[] }) {
                 />
               ))}
               {!cards.length && (
-                <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-3 py-6 text-center text-xs text-muted-foreground">
-                  Перетащите лид сюда
+                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground/70">
+                  Перетащите сюда
                 </div>
               )}
             </div>
