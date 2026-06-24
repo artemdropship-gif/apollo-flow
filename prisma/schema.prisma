@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Better Auth models
+// ----------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions   Session[]
+  accounts   Account[]
+  projects   Project[]
+  workflows  Workflow[]
+  leads      Lead[]
+  notes      Note[]
+  vaultItems VaultItem[]
+  prompts    Prompt[]
+  activities Activity[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ----------------------------------------------------------------------------
+// Apollo-Flow domain models
+// ----------------------------------------------------------------------------
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum LeadStatus {
+  NEW
+  IN_PROGRESS
+  CONTACTED
+  REPLIED
+  NEGOTIATION
+  CLIENT
+  REJECTED
+}
+
+enum VaultItemType {
+  SECRET
+  LINK
+}
+
+enum MessageChannel {
+  TELEGRAM
+  WHATSAPP
+  EMAIL
+  PROPOSAL
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  client      String?
+  deadline    DateTime?
+  status      ProjectStatus @default(ACTIVE)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflows   Workflow[]
+  vaultItems  VaultItem[]
+  prompts     Prompt[]
+  notes       Note[]
+  leads       Lead[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model Workflow {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  edges       Json?
+  viewport    Json?
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  nodes       WorkflowNode[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model WorkflowNode {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  type        String
+  label       String
+  description String?
+  notes       String?
+  tasks       Json?
+  tech        String?
+  posX        Float    @default(0)
+  posY        Float    @default(0)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workflowId])
+}
+
+model Lead {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId         String?
+  project           Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  name              String
+  niche             String?
+  city              String?
+  address           String?
+  phone             String?
+  email             String?
+  website           String?
+  rating            Float?
+  reviewsCount      Int?
+  workingHours      String?
+  lat               Float?
+  lng               Float?
+  source            String?
+  websiteStatus     String?
+  leadScore         Int              @default(0)
+  scoreReasons      Json?
+  aiAudit           Json?
+  aiRecommendations String?
+  status            LeadStatus       @default(NEW)
+  favorite          Boolean          @default(false)
+  contacted         Boolean          @default(false)
+  isClient          Boolean          @default(false)
+  comment           String?
+  messages          ContactMessage[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ContactMessage {
+  id        String         @id @default(cuid())
+  leadId    String
+  lead      Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel   MessageChannel
+  content   String
+  createdAt DateTime       @default(now())
+
+  @@index([leadId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title     String   @default("Untitled")
+  content   String   @default("")
+  tags      String[]
+  folder    String?
+  pinned    Boolean  @default(false)
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model VaultItem {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  type      VaultItemType
+  category  String?
+  label     String
+  valueEnc  String?
+  iv        String?
+  authTag   String?
+  url       String?
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model Prompt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title     String
+  tool      String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
