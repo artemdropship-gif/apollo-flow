@@ -103,6 +103,13 @@ built-in heuristic (no external calls), so it still runs without a key.
 include Gemini 2.5 Flash (Free), DeepSeek Chat, Qwen, Llama 3.3. Fallback model
 order is configured in `lib/ai/openrouter.ts`.
 
+**Where the key lives:** This repo is **public**, so the key is **never
+committed**. It is stored in the **Devin secrets store (org scope)** under the
+name `OPENROUTER_API_KEY` and is auto-injected as an env var in Devin sessions
+for this org. For local dev, put it in `.env` (gitignored). A new account that
+does not share this org's Devin secrets must add its own key once via
+https://openrouter.ai/keys.
+
 ---
 
 ## 6. Maps / business search
