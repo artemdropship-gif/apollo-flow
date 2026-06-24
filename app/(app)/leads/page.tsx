@@ -1,19 +1,19 @@
-import { Search } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
+import { requireUser } from "@/lib/session";
+import { getSavedLeads } from "@/lib/leads";
+import { LeadsClient } from "@/features/leads/components/leads-client";
 
-export default function LeadsPage() {
+export default async function LeadsPage() {
+  const user = await requireUser();
+  const savedLeads = await getSavedLeads(user.id);
+
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Leads Finder"
         description="Город + ниша → поиск компаний, аудит сайтов и Lead Score"
       />
-      <EmptyState
-        icon={Search}
-        title="Поиск клиентов скоро будет здесь"
-        description="Введите город и нишу — система найдёт компании на картах, проверит актуальность, проведёт AI-аудит сайта и рассчитает Lead Score, а затем сгенерирует персональные сообщения."
-      />
+      <LeadsClient savedLeads={savedLeads} />
     </div>
   );
 }

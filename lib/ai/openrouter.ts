@@ -6,9 +6,9 @@ export interface ChatMessage {
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 const FALLBACK_MODELS = [
-  "deepseek/deepseek-chat-v3.1:free",
-  "qwen/qwen3-235b-a22b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
 ];
 
 export function aiEnabled(): boolean {
@@ -23,7 +23,7 @@ export async function chat(
   if (!key) return null;
 
   const primary =
-    process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-exp:free";
+    process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
   const models = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
 
   for (const model of models) {
