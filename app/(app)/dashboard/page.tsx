@@ -1,23 +1,28 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import {
-  Activity,
-  KanbanSquare,
-  NotebookPen,
-  Search,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { Activity, BarChart3, Search } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const STATS = [
-  { label: "Найдено лидов", value: 0, icon: Search, hint: "За всё время" },
-  { label: "Активные проекты", value: 0, icon: KanbanSquare, hint: "В работе" },
-  { label: "Клиенты", value: 0, icon: Users, hint: "Закрытые сделки" },
-  { label: "Конверсия", value: "0%", icon: TrendingUp, hint: "Лид → клиент" },
-];
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/session";
+import { getDashboardMetrics } from "@/lib/dashboard";
+import { StatCards } from "@/features/dashboard/components/stat-cards";
+import {
+  RecentNotes,
+  RecentWorkflows,
+} from "@/features/dashboard/components/recent-lists";
+import {
+  StatusBarChart,
+  TimelineAreaChart,
+} from "@/features/dashboard/components/dashboard-charts";
+import { DashboardSkeleton } from "@/features/dashboard/components/dashboard-skeleton";
 
 export default function DashboardPage() {
   return (
@@ -32,24 +37,57 @@ export default function DashboardPage() {
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {STATS.map((stat) => (
-          <Card key={stat.label} className="glass">
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
+    </div>
+  );
+}
+
+async function DashboardContent() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
+  const metrics = await getDashboardMetrics(user.id);
+  const hasLeads = metrics.totals.leads > 0;
+
+  return (
+    <div className="space-y-6">
+      <StatCards totals={metrics.totals} />
+
+      {hasLeads ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Activity className="size-4 text-primary" />
+                Динамика за 14 дней
               </CardTitle>
-              <stat.icon className="size-4 text-primary" />
+              <CardDescription>
+                Найденные лиды и отправленные сообщения
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.hint}</p>
+              <TimelineAreaChart data={metrics.timeline} />
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="size-4 text-primary" />
+                Воронка по статусам
+              </CardTitle>
+              <CardDescription>
+                Распределение лидов от первого контакта до клиента
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <StatusBarChart data={metrics.statusCounts} />
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
         <EmptyState
           icon={Activity}
           title="Пока нет активности"
@@ -60,16 +98,11 @@ export default function DashboardPage() {
             </Button>
           }
         />
-        <EmptyState
-          icon={NotebookPen}
-          title="Нет заметок"
-          description="Создавайте заметки по проектам и клиентам — последние из них будут отображаться здесь."
-          action={
-            <Button variant="outline" render={<Link href="/notes" />}>
-              Открыть заметки
-            </Button>
-          }
-        />
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RecentNotes notes={metrics.recentNotes} />
+        <RecentWorkflows workflows={metrics.recentWorkflows} />
       </div>
     </div>
   );
