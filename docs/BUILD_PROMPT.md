@@ -1,12 +1,7 @@
 # Стартовый промт (рабочая лошадка)
 
-> Это рабочий промт/стандарт Архитектора — как вести проект между сессиями.
 > Новая сессия: вставь короткую версию + ссылку на репо. Полную версию (ниже)
 > используй только для НОВОГО проекта/первого запуска. Заполнять ничего не надо.
->
-> В Apollo-Flow этот промт также служит **движком Workflow Builder**: ИИ-генератор
-> архитектуры собирает схему из «Дефолтного стека» ниже, а сторонние интеграции
-> добавляет только по прямой команде.
 
 ## Короткая версия (повседневная — когда `AGENTS.md` уже есть)
 ```
@@ -34,48 +29,14 @@
   прогресс в `docs/STATUS.md`.
 
 ### Дефолтный стек (везде по умолчанию, не переспрашивать)
-**Ядро**
-- Next.js 15 (App Router) + React 18 + TypeScript (strict)
-- TailwindCSS + shadcn/ui + framer-motion
-- Состояние/данные: Zustand + TanStack Query
-- Формы/валидация: react-hook-form + zod
-- Иконки: lucide-react · Уведомления: sonner · Даты: date-fns
-
-**Backend / БД**
-- Server Actions + API Routes (Next.js)
+- Next.js 15 (App Router) + React 18 + TypeScript + Tailwind + framer-motion
 - Prisma ORM + PostgreSQL (Neon, pooled)
-- Валидация ввода через zod на границе
-
-**AI**
-- OpenRouter (ИСКЛЮЧИТЕЛЬНО бесплатные модели) + Vercel AI SDK для стриминга
-- Запасные модели — список fallback'ов, без падения при 404/лимите
-
-**Хостинг / DevX**
-- Деплой: Vercel (+ Vercel Blob при загрузках файлов)
-- Тесты: Vitest (unit) + Playwright (e2e); integration — при наличии БД
-- CI: GitHub Actions (lint + typecheck + test, hardened) + Dependabot
-- Точки сохранения: `scripts/savepoint.sh`
-
-**Спец-инструменты (когда профиль проекта требует)**
-- Визуальные схемы/конструкторы: React Flow (@xyflow/react)
-- Документы/экспорт: react-pdf, pdf-lib
-- Парсинг сайтов: Playwright + Cheerio
+- Хостинг/деплой: Vercel (+ Vercel Blob при загрузках файлов)
+- Тесты: Vitest (unit; integration — при наличии БД)
 - Telegram WebApp SDK — если проект Telegram Mini App
-
-### Подключаю ТОЛЬКО по прямой команде (сторонние интеграции)
-Сам по себе ничего из этого не интегрирую — только когда ты прямо скажешь:
-- **Платежи:** Stripe / ЮKassa
-- **Auth-провайдеры:** Clerk (если не Better Auth) / Auth.js
-- **Файлы:** UploadThing (если не Vercel Blob)
-- **Почта/рассылки:** Resend
-- **Очереди/cron вне Vercel:** Upstash QStash
-- **Кэш / rate-limit:** Upstash Redis
-- **Мониторинг/аналитика:** Sentry, PostHog, Vercel Analytics
-- **Поиск бизнеса/карты:** OpenStreetMap, 2GIS, Яндекс Карты, Google Maps
-- **CRM/отраслевые API:** Posiflora и т.п.
-
-> Другой стек (Auth: Better Auth по умолчанию для этого проекта) — только если
-> проект явно требует; сперва коротко спрошу зачем.
+- **Сторонние API-интеграции** (платёжки, CRM, Posiflora и т.п.) подключаю ТОЛЬКО
+  когда ты прямо скажешь. Сам по себе ничего не интегрирую.
+- Другой стек — только если проект явно требует; сперва коротко спрошу зачем.
 
 ### Шаг 0 — состояние проекта
 1. Репо уже склонировано в среде — не клонирую заново.
@@ -205,3 +166,30 @@ updates:
       actions-security: { applies-to: security-updates, patterns: ["*"] }
       actions-minor-and-patch: { patterns: ["*"], update-types: ["minor", "patch"] }
 ```
+
+---
+
+## Дополнительный инструментарий (addendum Apollo-Flow — НЕ часть базового промта)
+
+> Это каталог для **движка Workflow Builder**: из него ИИ выбирает блоки под идею.
+> Базовый «Дефолтный стек» выше — без изменений. Сюда вынесено всё расширение.
+> Сторонние интеграции отсюда подключаются ТОЛЬКО по прямой команде Архитектора.
+
+### По профилю проекта (библиотеки, ставлю когда задача требует)
+- **UI/UX:** shadcn/ui, Radix UI, lucide-react, sonner (тосты), cmdk (command palette)
+- **Состояние/данные:** Zustand, TanStack Query
+- **Формы/валидация:** react-hook-form, zod
+- **AI-стриминг:** Vercel AI SDK (поверх OpenRouter, только бесплатные модели)
+- **Схемы/конструкторы:** React Flow (@xyflow/react)
+- **Документы/экспорт:** react-pdf, pdf-lib
+- **Парсинг сайтов:** Playwright, Cheerio
+- **Графики:** Recharts
+
+### По прямой команде (сторонние API-интеграции — сам не подключаю)
+- **Платежи:** Stripe, ЮKassa
+- **Auth-провайдеры:** Clerk, Auth.js (если не Better Auth)
+- **Файлы:** UploadThing (если не Vercel Blob)
+- **Почта/рассылки:** Resend
+- **Очереди/cron вне Vercel:** Upstash QStash · **Кэш/rate-limit:** Upstash Redis
+- **Мониторинг/аналитика:** Sentry, PostHog, Vercel Analytics
+- **Поиск бизнеса/карты:** OpenStreetMap, 2GIS, Яндекс Карты, Google Maps
