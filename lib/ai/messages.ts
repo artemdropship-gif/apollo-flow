@@ -1,5 +1,5 @@
 import type { MessageChannel } from "@prisma/client";
-import { chat } from "@/lib/ai/openrouter";
+import { chat } from "@/lib/ai/anthropic";
 
 export interface LeadLike {
   name: string;

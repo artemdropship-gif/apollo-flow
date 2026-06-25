@@ -1,19 +1,14 @@
-import { Workflow } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
+import { ArchitectAssistant } from "@/components/workflow/architect-assistant";
 
 export default function WorkflowPage() {
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-4xl">
       <PageHeader
         title="Workflow Builder"
-        description="Интерактивный конструктор архитектуры проектов"
+        description="Опишите идею — AI-ассистент предложит архитектуру и стек"
       />
-      <EmptyState
-        icon={Workflow}
-        title="Конструктор архитектуры скоро будет здесь"
-        description="Стройте схемы из блоков (Frontend, Backend, API, БД, AI и др.) с drag-and-drop, или опишите идею — AI-ассистент сам предложит архитектуру и стек."
-      />
+      <ArchitectAssistant />
     </div>
   );
 }

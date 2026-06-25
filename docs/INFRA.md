@@ -88,20 +88,24 @@ undecryptable. Plan a re-encryption migration before rotating in production.
 
 ---
 
-## 5. AI — OpenRouter (free models)
+## 5. AI — Claude via Anthropic-compatible gateway (aiprimetech.io)
 
-AI features (audit reasoning, message generation, workflow assistant) call
-**OpenRouter** using free models only. If no key is set, the app falls back to a
-built-in heuristic (no external calls), so it still runs without a key.
+AI features (audit reasoning, message generation, workflow assistant) call an
+**Anthropic-compatible `/v1/messages` endpoint** — by default the
+`aiprimetech.io` gateway (the same provider used for the OpenClaw setup). If no
+token is set, the app falls back to a built-in heuristic (no external calls), so
+it still runs without a key.
 
 | Env var | Purpose |
 | --- | --- |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
-| `OPENROUTER_MODEL` | Primary model (default `google/gemini-2.0-flash-exp:free`) |
+| `ANTHROPIC_BASE_URL` | Gateway base URL (default `https://aiprimetech.io`) |
+| `ANTHROPIC_AUTH_TOKEN` | Bearer token for the gateway (also accepts `ANTHROPIC_API_KEY`) |
+| `ANTHROPIC_MODEL` | Claude model id (default `claude-sonnet-4-6`) |
 
-**How to get a key:** https://openrouter.ai/keys → Create Key. Free models
-include Gemini 2.5 Flash (Free), DeepSeek Chat, Qwen, Llama 3.3. Fallback model
-order is configured in `lib/ai/openrouter.ts`.
+**How to get a key:** from your `aiprimetech.io` account dashboard. The token is
+sent as `Authorization: Bearer <token>` to `${ANTHROPIC_BASE_URL}/v1/messages`.
+The client lives in `lib/ai/anthropic.ts`. To switch back to the official
+Anthropic API, set `ANTHROPIC_BASE_URL=https://api.anthropic.com`.
 
 ---
 

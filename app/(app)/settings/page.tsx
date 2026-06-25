@@ -55,7 +55,7 @@ export default async function SettingsPage() {
               Интеграции и API-ключи
             </CardTitle>
             <CardDescription>
-              OpenRouter (AI) и ключи карт настраиваются через переменные окружения
+              AI (Claude через aiprimetech.io) и ключи карт настраиваются через переменные окружения
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
