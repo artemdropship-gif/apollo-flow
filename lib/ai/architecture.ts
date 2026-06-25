@@ -182,7 +182,7 @@ export function fallbackArchitecture(idea: string): GeneratedArchitecture {
     { from: "be", to: "deploy" },
   ];
   if (wantsAi) {
-    base.push({ key: "ai", type: "ai", label: "AI", description: "ИИ-функции.", tech: "OpenRouter (free) + Vercel AI SDK", tasks: ["Промпты", "Стриминг ответов"] });
+    base.push({ key: "ai", type: "ai", label: "AI", description: "ИИ-функции.", tech: "Claude (Anthropic API) + Vercel AI SDK", tasks: ["Промпты", "Стриминг ответов"] });
     edges.push({ from: "be", to: "ai" });
   }
   if (wantsPayments) {

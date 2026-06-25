@@ -77,8 +77,15 @@ const ENV_TEMPLATE = `# Apollo-Flow — настройки приложения.
 # Строка подключения к базе данных PostgreSQL (Neon). ОБЯЗАТЕЛЬНО.
 DATABASE_URL=
 
-# Ключ для бесплатного ИИ-ассистента (OpenRouter). Без него ассистент не отвечает.
-OPENROUTER_API_KEY=
+# ИИ-ассистент (Claude через Anthropic-совместимый шлюз).
+# Без токена ассистент работает в офлайн-режиме (эвристика, без внешних вызовов).
+ANTHROPIC_BASE_URL=https://aiprimetech.io
+ANTHROPIC_AUTH_TOKEN=
+ANTHROPIC_MODEL=claude-sonnet-4-6
+
+# Ключ шифрования хранилища доступов (Vault). 64 hex-символа.
+# Сгенерировать: openssl rand -hex 32
+VAULT_ENCRYPTION_KEY=
 
 # Секрет авторизации. Можно оставить пустым — приложение сгенерирует автоматически.
 BETTER_AUTH_SECRET=
@@ -140,7 +147,7 @@ function ensureConfigured(env) {
     message: "Нужно указать доступ к базе данных",
     detail:
       "Откройте файл настроек и впишите DATABASE_URL (и, по желанию, " +
-      "OPENROUTER_API_KEY для ИИ-ассистента), затем снова запустите Apollo-Flow.\n\n" +
+      "ANTHROPIC_AUTH_TOKEN для ИИ-ассистента), затем снова запустите Apollo-Flow.\n\n" +
       `Файл: ${file}`,
     buttons: ["Открыть папку и выйти"],
   });

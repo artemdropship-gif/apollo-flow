@@ -35,7 +35,7 @@ jobs:
         env:
           DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
           BETTER_AUTH_SECRET: "ci-build-placeholder-secret-not-used-at-runtime"
-          OPENROUTER_API_KEY: ""
+          ANTHROPIC_AUTH_TOKEN: ""
           # electron-builder: do not attempt code signing.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run desktop:build:win
