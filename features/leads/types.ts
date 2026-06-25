@@ -1,5 +1,8 @@
 import type { Lead, MessageChannel } from "@prisma/client";
 import type { WebsiteAudit } from "@/lib/audit/website";
+import type { LeadSocials } from "@/lib/maps/osm";
+
+export type { LeadSocials };
 
 export interface ScoreReason {
   reason: string;
@@ -16,6 +19,8 @@ export interface LeadCandidate {
   email: string | null;
   website: string | null;
   workingHours: string | null;
+  socials: LeadSocials;
+  isChain: boolean;
   lat: number | null;
   lng: number | null;
   source: string;
@@ -31,8 +36,9 @@ export interface SearchResult {
   candidates: LeadCandidate[];
 }
 
-export type SavedLead = Omit<Lead, "scoreReasons"> & {
+export type SavedLead = Omit<Lead, "scoreReasons" | "socials"> & {
   scoreReasons: ScoreReason[] | null;
+  socials: LeadSocials | null;
 };
 
 export const MESSAGE_CHANNELS: { value: MessageChannel; label: string }[] = [

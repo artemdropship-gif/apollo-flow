@@ -193,6 +193,7 @@ model Lead {
   lng               Float?
   source            String?
   websiteStatus     String?
+  socials           Json?
   leadScore         Int              @default(0)
   scoreReasons      Json?
   aiAudit           Json?

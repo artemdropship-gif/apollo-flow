@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
-import { NICHES } from "@/lib/constants";
+import { CITIES, NICHES } from "@/lib/constants";
 import { searchLeads } from "@/features/leads/actions";
 import { ResultCard } from "@/features/leads/components/result-card";
 import type { LeadCandidate } from "@/features/leads/types";
@@ -49,7 +49,7 @@ export function SearchPanel() {
         <CardContent className="p-4">
           <form
             onSubmit={handleSearch}
-            className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+            className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
           >
             <div className="space-y-1.5">
               <Label htmlFor="city">Город</Label>
@@ -59,7 +59,13 @@ export function SearchPanel() {
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="Москва"
                 list="city-suggestions"
+                autoComplete="off"
               />
+              <datalist id="city-suggestions">
+                {CITIES.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="niche">Ниша</Label>
@@ -69,6 +75,7 @@ export function SearchPanel() {
                 onChange={(e) => setNiche(e.target.value)}
                 placeholder="Стоматология"
                 list="niche-suggestions"
+                autoComplete="off"
               />
               <datalist id="niche-suggestions">
                 {NICHES.map((n) => (
@@ -76,7 +83,11 @@ export function SearchPanel() {
                 ))}
               </datalist>
             </div>
-            <Button type="submit" disabled={pending}>
+            <Button
+              type="submit"
+              disabled={pending}
+              className="w-full sm:w-auto"
+            >
               {pending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

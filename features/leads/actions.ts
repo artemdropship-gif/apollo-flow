@@ -10,6 +10,7 @@ import { computeLeadScore, scorePriority } from "@/lib/score";
 import { generateMessage } from "@/lib/ai/messages";
 import type {
   LeadCandidate,
+  LeadSocials,
   ScoreReason,
   SearchResult,
 } from "@/features/leads/types";
@@ -94,6 +95,8 @@ export async function searchLeads(input: {
       email: biz.email,
       website: biz.website,
       workingHours: biz.workingHours,
+      socials: biz.socials,
+      isChain: biz.isChain,
       lat: biz.lat,
       lng: biz.lng,
       source: biz.source,
@@ -136,6 +139,7 @@ export async function saveLead(
       email: candidate.email,
       website: candidate.website,
       workingHours: candidate.workingHours,
+      socials: candidate.socials as unknown as object,
       lat: candidate.lat,
       lng: candidate.lng,
       source: candidate.source,
@@ -205,6 +209,112 @@ export async function setLeadComment(
 export async function deleteLead(id: string): Promise<void> {
   const user = await requireUser();
   await prisma.lead.deleteMany({ where: { id, userId: user.id } });
+  revalidatePath("/leads");
+}
+
+export interface LeadEditInput {
+  name: string;
+  niche: string | null;
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  workingHours: string | null;
+  socials: LeadSocials;
+  comment: string | null;
+}
+
+function cleanSocials(socials: LeadSocials): LeadSocials {
+  const out: LeadSocials = {};
+  for (const [k, v] of Object.entries(socials)) {
+    if (v && v.trim()) out[k as keyof LeadSocials] = v.trim();
+  }
+  return out;
+}
+
+export async function editLead(
+  id: string,
+  input: LeadEditInput,
+): Promise<void> {
+  const user = await requireUser();
+  const name = input.name.trim();
+  if (!name) throw new Error("Имя обязательно");
+
+  await prisma.lead.updateMany({
+    where: { id, userId: user.id },
+    data: {
+      name,
+      niche: input.niche?.trim() || null,
+      city: input.city?.trim() || null,
+      address: input.address?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      website: input.website?.trim() || null,
+      workingHours: input.workingHours?.trim() || null,
+      socials: cleanSocials(input.socials) as unknown as object,
+      comment: input.comment?.trim() || null,
+    },
+  });
+  revalidatePath("/leads");
+}
+
+export async function createLeadManually(
+  input: LeadEditInput,
+): Promise<{ id: string }> {
+  const user = await requireUser();
+  const name = input.name.trim();
+  if (!name) throw new Error("Имя обязательно");
+
+  const lead = await prisma.lead.create({
+    data: {
+      userId: user.id,
+      name,
+      niche: input.niche?.trim() || null,
+      city: input.city?.trim() || null,
+      address: input.address?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      website: input.website?.trim() || null,
+      workingHours: input.workingHours?.trim() || null,
+      socials: cleanSocials(input.socials) as unknown as object,
+      comment: input.comment?.trim() || null,
+      source: "manual",
+      websiteStatus: input.website?.trim() ? "Есть сайт" : "Нет сайта",
+    },
+    select: { id: true },
+  });
+
+  await prisma.activity.create({
+    data: {
+      userId: user.id,
+      type: "lead.created",
+      entity: "lead",
+      entityId: lead.id,
+      meta: { name },
+    },
+  });
+
+  revalidatePath("/leads");
+  return { id: lead.id };
+}
+
+export async function attachLeadProject(
+  id: string,
+  projectId: string | null,
+): Promise<void> {
+  const user = await requireUser();
+  if (projectId) {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: user.id },
+      select: { id: true },
+    });
+    if (!project) throw new Error("Проект не найден");
+  }
+  await prisma.lead.updateMany({
+    where: { id, userId: user.id },
+    data: { projectId },
+  });
   revalidatePath("/leads");
 }
 

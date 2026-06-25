@@ -8,13 +8,20 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LEAD_STATUSES } from "@/lib/constants";
 import { SavedLeadCard } from "@/features/leads/components/saved-lead-card";
+import type { ProjectOption } from "@/features/projects/actions";
 import type { SavedLead } from "@/features/leads/types";
 
 type Filter = "ALL" | "FAVORITE" | "HOT" | LeadStatus;
 
 const HOT_THRESHOLD = 65;
 
-export function SavedPanel({ leads }: { leads: SavedLead[] }) {
+export function SavedPanel({
+  leads,
+  projects,
+}: {
+  leads: SavedLead[];
+  projects: ProjectOption[];
+}) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
 
@@ -101,7 +108,7 @@ export function SavedPanel({ leads }: { leads: SavedLead[] }) {
       {filtered.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((lead) => (
-            <SavedLeadCard key={lead.id} lead={lead} />
+            <SavedLeadCard key={lead.id} lead={lead} projects={projects} />
           ))}
         </div>
       ) : (

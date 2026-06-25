@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { generateLeadMessage } from "@/features/leads/actions";
 import { MESSAGE_CHANNELS } from "@/features/leads/types";
+import type { LeadSocials } from "@/features/leads/types";
 
 const SEND_LABEL: Record<MessageChannel, string> = {
   TELEGRAM: "Открыть в Telegram",
@@ -36,20 +37,29 @@ const SEND_LABEL: Record<MessageChannel, string> = {
 function buildSendLink(
   channel: MessageChannel,
   content: string,
-  lead: { phone?: string | null; email?: string | null; website?: string | null },
+  lead: {
+    phone?: string | null;
+    email?: string | null;
+    website?: string | null;
+    socials?: LeadSocials | null;
+  },
 ): string | null {
   if (!content.trim()) return null;
   const text = encodeURIComponent(content);
   const digits = (lead.phone ?? "").replace(/\D/g, "");
+  const socials = lead.socials ?? {};
 
   if (channel === "WHATSAPP") {
+    if (socials.whatsapp) {
+      const waDigits = socials.whatsapp.replace(/\D/g, "");
+      return waDigits ? `https://wa.me/${waDigits}?text=${text}` : null;
+    }
     return digits ? `https://wa.me/${digits}?text=${text}` : null;
   }
   if (channel === "TELEGRAM") {
-    // Telegram can't DM by phone, so open the share sheet with the text ready.
-    return `https://t.me/share/url?url=${encodeURIComponent(
-      lead.website ?? "",
-    )}&text=${text}`;
+    // Open the lead's real Telegram contact only when one actually exists;
+    // direct DMs can't be pre-filled, so paste the copied text after opening.
+    return socials.telegram ?? null;
   }
   // EMAIL / PROPOSAL → mailto, pulling the subject out of a leading "Тема: …" line.
   if (!lead.email) return null;
@@ -71,12 +81,14 @@ export function MessageDialog({
   phone,
   email,
   website,
+  socials,
 }: {
   leadId: string;
   leadName: string;
   phone?: string | null;
   email?: string | null;
   website?: string | null;
+  socials?: LeadSocials | null;
 }) {
   const [channel, setChannel] = useState<MessageChannel>("TELEGRAM");
   const [drafts, setDrafts] = useState<Partial<Record<MessageChannel, string>>>(
@@ -86,7 +98,12 @@ export function MessageDialog({
   const [pending, startTransition] = useTransition();
 
   const content = drafts[channel] ?? "";
-  const sendLink = buildSendLink(channel, content, { phone, email, website });
+  const sendLink = buildSendLink(channel, content, {
+    phone,
+    email,
+    website,
+    socials,
+  });
 
   function generate(target: MessageChannel) {
     startTransition(async () => {
@@ -186,11 +203,13 @@ export function MessageDialog({
               title={
                 sendLink
                   ? SEND_LABEL[channel]
-                  : channel === "WHATSAPP"
-                    ? "Нет телефона лида"
-                    : channel === "EMAIL" || channel === "PROPOSAL"
-                      ? "Нет email лида"
-                      : "Сначала сгенерируйте текст"
+                  : !content.trim()
+                    ? "Сначала сгенерируйте текст"
+                    : channel === "WHATSAPP"
+                      ? "Нет WhatsApp/телефона лида"
+                      : channel === "TELEGRAM"
+                        ? "Нет Telegram-контакта лида"
+                        : "Нет email лида"
               }
               render={
                 <a

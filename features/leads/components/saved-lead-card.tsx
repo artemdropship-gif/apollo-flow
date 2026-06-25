@@ -2,15 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { LeadStatus } from "@prisma/client";
-import {
-  Globe,
-  Loader2,
-  MapPin,
-  Mail,
-  Phone,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Loader2, Pencil, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,13 +15,22 @@ import {
   toggleLeadFavorite,
   updateLeadStatus,
 } from "@/features/leads/actions";
+import { ContactLinks } from "@/features/leads/components/contact-links";
+import { LeadEditDialog } from "@/features/leads/components/lead-edit-dialog";
 import { MessageDialog } from "@/features/leads/components/message-dialog";
 import { ScoreBadge } from "@/features/leads/components/score-badge";
 import { TemperatureBadge } from "@/features/leads/components/temperature-badge";
 import { siteSignalsFromReasons } from "@/lib/score";
+import type { ProjectOption } from "@/features/projects/actions";
 import type { SavedLead } from "@/features/leads/types";
 
-export function SavedLeadCard({ lead }: { lead: SavedLead }) {
+export function SavedLeadCard({
+  lead,
+  projects,
+}: {
+  lead: SavedLead;
+  projects: ProjectOption[];
+}) {
   const [favorite, setFavorite] = useState(lead.favorite);
   const [status, setStatus] = useState<LeadStatus>(lead.status);
   const [comment, setComment] = useState(lead.comment ?? "");
@@ -98,39 +99,13 @@ export function SavedLeadCard({ lead }: { lead: SavedLead }) {
           </div>
         </div>
 
-        <div className="space-y-1 text-sm text-muted-foreground">
-          {lead.address && (
-            <p className="flex items-center gap-2">
-              <MapPin className="size-3.5 shrink-0" />
-              <span className="truncate">{lead.address}</span>
-            </p>
-          )}
-          {lead.phone && (
-            <p className="flex items-center gap-2">
-              <Phone className="size-3.5 shrink-0" />
-              {lead.phone}
-            </p>
-          )}
-          {lead.email && (
-            <p className="flex items-center gap-2">
-              <Mail className="size-3.5 shrink-0" />
-              <span className="truncate">{lead.email}</span>
-            </p>
-          )}
-          {lead.website && (
-            <p className="flex items-center gap-2">
-              <Globe className="size-3.5 shrink-0" />
-              <a
-                href={lead.website}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate text-primary hover:underline"
-              >
-                {lead.website.replace(/^https?:\/\//, "")}
-              </a>
-            </p>
-          )}
-        </div>
+        <ContactLinks
+          address={lead.address}
+          phone={lead.phone}
+          email={lead.email}
+          website={lead.website}
+          socials={lead.socials}
+        />
 
         {lead.aiRecommendations && (
           <p className="text-sm text-muted-foreground">
@@ -157,6 +132,17 @@ export function SavedLeadCard({ lead }: { lead: SavedLead }) {
             phone={lead.phone}
             email={lead.email}
             website={lead.website}
+            socials={lead.socials}
+          />
+          <LeadEditDialog
+            lead={lead}
+            projects={projects}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Pencil className="size-4" />
+                Изменить
+              </Button>
+            }
           />
           <Button
             variant="ghost"

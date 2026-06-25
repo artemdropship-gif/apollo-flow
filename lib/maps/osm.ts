@@ -1,3 +1,12 @@
+export interface LeadSocials {
+  telegram?: string;
+  whatsapp?: string;
+  instagram?: string;
+  vk?: string;
+  facebook?: string;
+  youtube?: string;
+}
+
 export interface RawBusiness {
   name: string;
   address: string | null;
@@ -5,6 +14,9 @@ export interface RawBusiness {
   email: string | null;
   website: string | null;
   workingHours: string | null;
+  socials: LeadSocials;
+  /** True when OSM marks this POI as part of a brand/chain. */
+  isChain: boolean;
   lat: number | null;
   lng: number | null;
   source: string;
@@ -120,6 +132,63 @@ function buildAddress(tags: Record<string, string>): string | null {
   return parts.length ? parts.join(", ") : null;
 }
 
+/** Picks the first present tag from a list of candidate keys. */
+function pick(tags: Record<string, string>, keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = tags[k];
+    if (v && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
+/** Turns a raw OSM contact value (handle or URL) into a usable URL. */
+function toUrl(raw: string, base: string, handlePrefix = ""): string {
+  const v = raw.trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  const handle = v.replace(/^@/, "").replace(/^\/+/, "");
+  return `${base}/${handlePrefix}${handle}`;
+}
+
+/** Extracts every social/contact channel OSM exposes for a POI. */
+function extractSocials(tags: Record<string, string>): LeadSocials {
+  const socials: LeadSocials = {};
+
+  const tg = pick(tags, ["contact:telegram", "telegram", "contact:tg"]);
+  if (tg) socials.telegram = toUrl(tg, "https://t.me");
+
+  const wa = pick(tags, ["contact:whatsapp", "whatsapp"]);
+  if (wa) {
+    const digits = wa.replace(/[^\d]/g, "");
+    socials.whatsapp = digits
+      ? `https://wa.me/${digits}`
+      : toUrl(wa, "https://wa.me");
+  }
+
+  const ig = pick(tags, ["contact:instagram", "instagram"]);
+  if (ig) socials.instagram = toUrl(ig, "https://instagram.com");
+
+  const vk = pick(tags, ["contact:vk", "contact:vkontakte", "vk"]);
+  if (vk) socials.vk = toUrl(vk, "https://vk.com");
+
+  const fb = pick(tags, ["contact:facebook", "facebook"]);
+  if (fb) socials.facebook = toUrl(fb, "https://facebook.com");
+
+  const yt = pick(tags, ["contact:youtube", "youtube"]);
+  if (yt) socials.youtube = toUrl(yt, "https://youtube.com");
+
+  return socials;
+}
+
+/** Detects whether a POI belongs to a brand/chain (to deprioritise). */
+function detectChain(tags: Record<string, string>): boolean {
+  return Boolean(
+    tags["brand"] ||
+      tags["brand:wikidata"] ||
+      tags["brand:wikipedia"] ||
+      tags["operator:wikidata"],
+  );
+}
+
 export async function searchBusinesses(params: {
   city: string;
   niche: string;
@@ -129,7 +198,7 @@ export async function searchBusinesses(params: {
   const area = await geocodeCity(params.city);
   if (!area) return { results: [], area: null };
 
-  const query = buildQuery(area.areaId, params.niche, limit * 2);
+  const query = buildQuery(area.areaId, params.niche, limit * 4);
   const res = await fetch(OVERPASS, {
     method: "POST",
     headers: {
@@ -157,16 +226,34 @@ export async function searchBusinesses(params: {
     results.push({
       name,
       address: buildAddress(tags),
-      phone: tags.phone || tags["contact:phone"] || null,
-      email: tags.email || tags["contact:email"] || null,
-      website: tags.website || tags["contact:website"] || tags.url || null,
+      phone:
+        pick(tags, ["phone", "contact:phone", "contact:mobile", "mobile"]) ??
+        null,
+      email: pick(tags, ["email", "contact:email"]) ?? null,
+      website:
+        pick(tags, ["website", "contact:website", "url", "contact:url"]) ??
+        null,
       workingHours: tags.opening_hours || null,
+      socials: extractSocials(tags),
+      isChain: detectChain(tags),
       lat,
       lng,
       source: "openstreetmap",
     });
-    if (results.length >= limit) break;
+    if (results.length >= limit * 2) break;
   }
 
-  return { results, area };
+  // Prefer independent businesses with richer contact data; push big chains down.
+  const contactScore = (b: RawBusiness) =>
+    (b.phone ? 1 : 0) +
+    (b.email ? 1 : 0) +
+    (b.website ? 1 : 0) +
+    Object.keys(b.socials).length;
+
+  results.sort((a, b) => {
+    if (a.isChain !== b.isChain) return a.isChain ? 1 : -1;
+    return contactScore(b) - contactScore(a);
+  });
+
+  return { results: results.slice(0, limit), area };
 }
