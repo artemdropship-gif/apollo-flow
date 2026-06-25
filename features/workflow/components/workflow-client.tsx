@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Sparkles, Trash2, Workflow as WorkflowIcon } from "lucide-react";
+import { ArrowLeft, FilePlus2, Sparkles, Trash2, Workflow as WorkflowIcon } from "lucide-react";
 import { toast } from "sonner";
 import { ApolloCore } from "@/components/layout/apollo-core";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
+  createEmptyWorkflow,
   deleteWorkflow,
   generateWorkflow,
   type WorkflowDetail,
@@ -38,6 +39,19 @@ export function WorkflowClient({
   const [mode, setMode] = useState<"scratch" | "business">("scratch");
   const [leadId, setLeadId] = useState("");
   const [pending, startTransition] = useTransition();
+
+  function createEmpty() {
+    if (pending) return;
+    startTransition(async () => {
+      const res = await createEmptyWorkflow();
+      if (!res.ok || !res.id) {
+        toast.error("Не удалось создать воркфлоу");
+        return;
+      }
+      toast.success("Пустой воркфлоу создан — добавляйте блоки");
+      router.push(`/workflow?id=${res.id}`);
+    });
+  }
 
   function generate(text: string) {
     const value = text.trim();
@@ -105,10 +119,23 @@ export function WorkflowClient({
               Проект Аполлон спроектирует продукт по вашему рабочему стандарту
             </p>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={createEmpty}
+              disabled={pending}
+            >
+              <FilePlus2 className="size-3.5" />
+              Пустой воркфлоу
+            </Button>
             <ImportDialog />
           </div>
         </div>
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          «Пустой воркфлоу» — соберите архитектуру сами с нуля, а ИИ потом
+          дополнит изнутри по запросу.
+        </p>
 
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className="inline-flex overflow-hidden rounded-md border border-border">

@@ -231,6 +231,119 @@ export async function architectureFromText(
   return null;
 }
 
+export interface AugmentResult {
+  nodes: GeneratedNode[];
+  edges: GeneratedEdge[];
+}
+
+export interface CurrentBlock {
+  key: string;
+  type: string;
+  label: string;
+  tech: string;
+  description: string;
+}
+
+/**
+ * Augment an existing (possibly empty / hand-built) workflow. The model is asked
+ * to add ONLY what is missing or clearly better, never to rewrite what's there.
+ * Returns the NEW nodes + edges to merge in (edges may reference existing keys).
+ */
+export async function augmentArchitecture(input: {
+  name: string;
+  description: string;
+  goal: string;
+  current: CurrentBlock[];
+  instruction: string;
+}): Promise<{ added: AugmentResult; ai: boolean } | null> {
+  const std = buildStandard();
+  const standardBlock = std
+    ? `\n\nРАБОЧИЙ СТАНДАРТ АРХИТЕКТОРА (канон — держись его):\n"""\n${std}\n"""`
+    : "";
+  const currentList = input.current.length
+    ? input.current
+        .map(
+          (b) =>
+            `- key="${b.key}" [${b.type}] ${b.label}${b.tech ? ` · стек: ${b.tech}` : ""}${b.description ? ` — ${b.description}` : ""}`,
+        )
+        .join("\n")
+    : "(пусто — воркфлоу ещё без блоков)";
+
+  const system = `Ты — «Проект Аполлон», ИИ-архитектор внутри Apollo-Flow. Обращаешься «Архитектор».
+
+Тебе дают УЖЕ СУЩЕСТВУЮЩИЙ воркфлоу (возможно собранный Архитектором вручную) и его запрос. Твоя задача — ДОПОЛНИТЬ его, работая ВНУТРИ воркфлоу, а НЕ переписывать. По умолчанию сохраняй всё как есть.
+
+Добавляй новые блоки/связи ТОЛЬКО ЕСЛИ:
+  • текущей структуры объективно НЕ ХВАТАЕТ для запроса/целей, или
+  • есть явно ЛУЧШИЙ вариант под задачу.
+Если воркфлоу пустой — помоги структурировать мысль: предложи минимально нужные блоки под запрос. НЕ дублируй уже существующие блоки. В edges можешь ссылаться как на key новых блоков, так и на key существующих (они даны ниже).${standardBlock}
+
+Доступные типы блоков (type): frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment.
+
+Верни ТОЛЬКО валидный JSON без markdown, по схеме (nodes — ТОЛЬКО НОВЫЕ блоки; если добавлять нечего — пустые массивы):
+{
+  "nodes": [ { "key": "уникальный_новый_key", "type": "backend", "label": "...", "description": "почему добавлен", "tech": "...", "tasks": ["..."] } ],
+  "edges": [ { "from": "keyOткуда", "to": "keyКуда" } ]
+}
+Текст полей — по-русски. Никаких комментариев вне JSON.`;
+
+  const user = `Воркфлоу: ${input.name}${input.description ? `\nСуть: ${input.description}` : ""}${input.goal ? `\nЦель: ${input.goal}` : ""}
+
+Текущие блоки:
+${currentList}
+
+Запрос Архитектора: ${input.instruction.slice(0, 4000)}`;
+
+  const raw = await chat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    { temperature: 0.3, maxTokens: 6000, prefill: "{" },
+  );
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(extractJson(raw)) as {
+      nodes?: unknown;
+      edges?: unknown;
+    };
+    const existingKeys = new Set(input.current.map((b) => b.key));
+    const seen = new Set<string>(existingKeys);
+    const nodes: GeneratedNode[] = [];
+    if (Array.isArray(parsed.nodes)) {
+      for (const item of parsed.nodes as RawNode[]) {
+        if (!item || typeof item !== "object") continue;
+        const type = str(item.type).toLowerCase();
+        if (!isBlockType(type)) continue;
+        let key = str(item.key).trim() || type;
+        while (seen.has(key)) key = `${key}_${seen.size}`;
+        seen.add(key);
+        nodes.push({
+          key,
+          type,
+          label: str(item.label, type).slice(0, 120),
+          description: str(item.description).slice(0, 2000),
+          tech: str(item.tech).slice(0, 500),
+          tasks: Array.isArray(item.tasks)
+            ? (item.tasks as unknown[])
+                .filter((t): t is string => typeof t === "string")
+                .slice(0, 8)
+            : [],
+        });
+      }
+    }
+    const allKeys = new Set([...existingKeys, ...nodes.map((n) => n.key)]);
+    const edges: GeneratedEdge[] = Array.isArray(parsed.edges)
+      ? (parsed.edges as Record<string, unknown>[])
+          .map((e) => ({ from: str(e.from), to: str(e.to) }))
+          .filter((e) => allKeys.has(e.from) && allKeys.has(e.to) && e.from !== e.to)
+      : [];
+    return { added: { nodes, edges }, ai: true };
+  } catch {
+    return null;
+  }
+}
+
 export async function generateArchitecture(
   idea: string,
   businessContext?: string,

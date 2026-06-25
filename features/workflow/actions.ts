@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   architectureFromText,
+  augmentArchitecture,
   generateArchitecture,
   type GeneratedArchitecture,
   type GeneratedPage,
@@ -528,6 +529,166 @@ export async function deleteWorkflowNode(
   await prisma.workflowNode.delete({ where: { id: nodeId } });
   revalidatePath("/workflow");
   return { ok: true };
+}
+
+/** Create a blank workflow (no AI) so the Architect can build it by hand. */
+export async function createEmptyWorkflow(
+  name?: string,
+): Promise<{ ok: boolean; id?: string }> {
+  const user = await requireUser();
+  const workflow = await prisma.workflow.create({
+    data: {
+      userId: user.id,
+      name: (name?.trim() || "Новый воркфлоу").slice(0, 120),
+      description: "",
+      goal: "",
+      design: "",
+      edges: [] as unknown as object,
+    },
+    select: { id: true },
+  });
+  await prisma.activity
+    .create({
+      data: {
+        userId: user.id,
+        type: "workflow.create_empty",
+        entity: "workflow",
+        entityId: workflow.id,
+      },
+    })
+    .catch(() => undefined);
+  revalidatePath("/workflow");
+  revalidatePath("/dashboard");
+  return { ok: true, id: workflow.id };
+}
+
+/**
+ * Ask the AI to augment an existing (or empty) workflow: it adds only the blocks
+ * and connections that are missing or clearly better, merging them in-place
+ * without touching the Architect's existing blocks.
+ */
+export async function augmentWorkflow(input: {
+  id: string;
+  instruction: string;
+}): Promise<{
+  ok: boolean;
+  added?: number;
+  ai?: boolean;
+  nodes?: WorkflowNodeData[];
+  edges?: WorkflowEdge[];
+  error?: string;
+}> {
+  const user = await requireUser();
+  const instruction = input.instruction.trim();
+  if (instruction.length < 3) {
+    return { ok: false, error: "Опишите, что дополнить, Архитектор." };
+  }
+
+  const existing = await prisma.workflow.findFirst({
+    where: { id: input.id, userId: user.id },
+    include: { nodes: true },
+  });
+  if (!existing) return { ok: false, error: "Воркфлоу не найден." };
+
+  // Stable per-node key the model can reference in edges.
+  const nodeKey = (id: string, type: string) => `${type}_${id.slice(-4)}`;
+  const idByKey = new Map<string, string>();
+  for (const n of existing.nodes) idByKey.set(nodeKey(n.id, n.type), n.id);
+
+  const res = await augmentArchitecture({
+    name: existing.name,
+    description: existing.description ?? "",
+    goal: existing.goal ?? "",
+    current: existing.nodes.map((n) => ({
+      key: nodeKey(n.id, n.type),
+      type: n.type,
+      label: n.label,
+      tech: n.tech ?? "",
+      description: n.description ?? "",
+    })),
+    instruction,
+  });
+
+  if (!res) {
+    return { ok: false, error: "Модель недоступна — попробуйте ещё раз." };
+  }
+  if (res.added.nodes.length === 0 && res.added.edges.length === 0) {
+    return { ok: true, added: 0, ai: res.ai, nodes: [], edges: [] };
+  }
+
+  const baseY = existing.nodes.reduce((m, n) => Math.max(m, n.posY), 0) + 200;
+  const createdNodes: WorkflowNodeData[] = [];
+  for (let i = 0; i < res.added.nodes.length; i++) {
+    const n = res.added.nodes[i];
+    const pos = layout(i, n.type);
+    const created = await prisma.workflowNode.create({
+      data: {
+        workflowId: existing.id,
+        type: n.type,
+        label: n.label,
+        description: n.description,
+        tech: n.tech,
+        tasks: n.tasks,
+        posX: pos.x,
+        posY: existing.nodes.length ? baseY + pos.y : pos.y,
+        color: blockMeta(n.type).color,
+      },
+    });
+    idByKey.set(n.key, created.id);
+    createdNodes.push({
+      id: created.id,
+      type: created.type,
+      label: created.label,
+      description: created.description ?? "",
+      notes: created.notes ?? "",
+      tech: created.tech ?? "",
+      tasks: Array.isArray(created.tasks) ? (created.tasks as unknown as string[]) : [],
+      posX: created.posX,
+      posY: created.posY,
+      color: created.color ?? blockMeta(created.type).color,
+    });
+  }
+
+  const prevEdges = Array.isArray(existing.edges)
+    ? (existing.edges as unknown as WorkflowEdge[])
+    : [];
+  const existingPairs = new Set(prevEdges.map((e) => `${e.source}->${e.target}`));
+  const newEdges = res.added.edges
+    .map((e) => {
+      const source = idByKey.get(e.from);
+      const target = idByKey.get(e.to);
+      return source && target
+        ? { id: `${source}-${target}`, source, target }
+        : null;
+    })
+    .filter((e): e is WorkflowEdge => e !== null)
+    .filter((e) => !existingPairs.has(`${e.source}->${e.target}`));
+
+  await prisma.workflow.update({
+    where: { id: existing.id },
+    data: { edges: [...prevEdges, ...newEdges] as unknown as object },
+  });
+
+  await prisma.activity
+    .create({
+      data: {
+        userId: user.id,
+        type: "workflow.augment",
+        entity: "workflow",
+        entityId: existing.id,
+        meta: { added: res.added.nodes.length, instruction: instruction.slice(0, 200) },
+      },
+    })
+    .catch(() => undefined);
+
+  revalidatePath("/workflow");
+  return {
+    ok: true,
+    added: res.added.nodes.length,
+    ai: res.ai,
+    nodes: createdNodes,
+    edges: newEdges,
+  };
 }
 
 export async function deleteWorkflow(id: string): Promise<{ ok: boolean }> {
