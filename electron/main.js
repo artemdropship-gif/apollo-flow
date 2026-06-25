@@ -14,10 +14,28 @@ const crypto = require("crypto");
 const { spawn } = require("child_process");
 
 const PORT = Number(process.env.APOLLO_DESKTOP_PORT || 34117);
-// Use "localhost" consistently for binding, the window URL, and the auth URL so
-// the request Origin matches Better Auth's trusted origin (no "Invalid origin").
-const HOST = "localhost";
+// Use the explicit IPv4 loopback for binding, the window URL, AND the readiness
+// probe. On Windows "localhost" often resolves to IPv6 (::1) first, which can
+// mismatch how the Next server binds and cause "Server did not start in time".
+// 127.0.0.1 is unambiguous everywhere, and Better Auth trusts this origin.
+const HOST = "127.0.0.1";
 const BASE_URL = `http://${HOST}:${PORT}`;
+
+// Keep the last lines of the embedded server's output so we can show a real
+// reason if it fails to come up (instead of a generic timeout).
+const serverLogLines = [];
+let serverExitInfo = null;
+function recordServerLog(chunk) {
+  const text = String(chunk);
+  process.stdout.write(`[next] ${text}`);
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim()) serverLogLines.push(line);
+  }
+  while (serverLogLines.length > 40) serverLogLines.shift();
+}
+function serverLogTail() {
+  return serverLogLines.slice(-15).join("\n");
+}
 
 // In a packaged app the server bundle lives under resources/; in dev it's the
 // repo's .next/standalone produced by `next build`.
@@ -130,17 +148,36 @@ function ensureConfigured(env) {
   return false;
 }
 
-function waitForServer(timeoutMs = 30000) {
+function waitForServer(timeoutMs = 90000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
-      const req = http.get(BASE_URL, (res) => {
-        res.destroy();
-        resolve();
-      });
+      // If the server process already died, fail immediately with its output.
+      if (serverExitInfo) {
+        reject(
+          new Error(
+            `Встроенный сервер завершился (код ${serverExitInfo.code}).\n\n` +
+              serverLogTail(),
+          ),
+        );
+        return;
+      }
+      const req = http.get(
+        { host: HOST, port: PORT, path: "/", family: 4 },
+        (res) => {
+          res.destroy();
+          resolve();
+        },
+      );
       req.on("error", () => {
         if (Date.now() - start > timeoutMs) {
-          reject(new Error("Server did not start in time"));
+          const tail = serverLogTail();
+          reject(
+            new Error(
+              "Сервер не запустился вовремя." +
+                (tail ? `\n\nПоследние сообщения сервера:\n${tail}` : ""),
+            ),
+          );
         } else {
           setTimeout(tryOnce, 300);
         }
@@ -169,13 +206,23 @@ function startServer(fileEnv) {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  serverProcess.stdout.on("data", (d) => process.stdout.write(`[next] ${d}`));
-  serverProcess.stderr.on("data", (d) => process.stderr.write(`[next] ${d}`));
+  serverProcess.stdout.on("data", recordServerLog);
+  serverProcess.stderr.on("data", recordServerLog);
   serverProcess.on("exit", (code) => {
-    if (code && code !== 0 && !app.isQuitting) {
+    serverExitInfo = { code };
+    // Persist the server log so a failed launch can be diagnosed afterwards.
+    try {
+      fs.writeFileSync(
+        path.join(app.getPath("userData"), "server.log"),
+        serverLogLines.join("\n"),
+      );
+    } catch {
+      /* ignore */
+    }
+    if (code && code !== 0 && !app.isQuitting && mainWindow) {
       dialog.showErrorBox(
         "Apollo-Flow",
-        `Встроенный сервер завершился с кодом ${code}.`,
+        `Встроенный сервер завершился с кодом ${code}.\n\n${serverLogTail()}`,
       );
     }
   });
