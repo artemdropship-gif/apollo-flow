@@ -5,15 +5,12 @@ name: Build Windows desktop app
 # Trigger manually (Actions tab → Run workflow), on a version tag, or when the
 # desktop shell / build config changes.
 on:
+  # Manual run from the Actions tab (once this workflow is on the default branch).
   workflow_dispatch:
+  # Pushing a version tag (e.g. v0.1.0) builds the installer from that commit.
   push:
     tags:
       - "v*"
-    paths:
-      - "electron/**"
-      - "scripts/desktop-prepare.js"
-      - "package.json"
-      - ".github/workflows/build-windows.yml"
 
 jobs:
   build:
