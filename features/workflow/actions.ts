@@ -2,8 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { generateArchitecture } from "@/lib/ai/architecture";
+import {
+  architectureFromText,
+  generateArchitecture,
+  type GeneratedArchitecture,
+} from "@/lib/ai/architecture";
 import { blockMeta, isBlockType } from "@/lib/workflow/blocks";
+import {
+  parseInterchange,
+  toJsonExport,
+  toMarkdownExport,
+  type Interchange,
+} from "@/lib/workflow/interchange";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 
@@ -106,25 +116,18 @@ export async function getWorkflow(id: string): Promise<WorkflowDetail | null> {
   };
 }
 
-export async function generateWorkflow(
-  ideaInput: string,
-): Promise<{ ok: boolean; id?: string; ai?: boolean; error?: string }> {
-  const user = await requireUser();
-  const idea = ideaInput.trim();
-  if (idea.length < 3) {
-    return { ok: false, error: "Опишите идею подробнее, Архитектор." };
-  }
-
-  const { architecture, ai } = await generateArchitecture(idea);
-
+/** Create a workflow + nodes + edges from an architecture. Returns its id. */
+async function persistArchitecture(
+  userId: string,
+  arch: GeneratedArchitecture | Interchange,
+): Promise<string> {
   const workflow = await prisma.workflow.create({
-    data: { userId: user.id, name: architecture.name, description: architecture.description },
+    data: { userId, name: arch.name, description: arch.description },
   });
 
-  // Persist nodes, remembering the db id assigned to each generated key.
   const keyToId = new Map<string, string>();
-  for (let i = 0; i < architecture.nodes.length; i++) {
-    const n = architecture.nodes[i];
+  for (let i = 0; i < arch.nodes.length; i++) {
+    const n = arch.nodes[i];
     const pos = layout(i, n.type);
     const created = await prisma.workflowNode.create({
       data: {
@@ -142,7 +145,19 @@ export async function generateWorkflow(
     keyToId.set(n.key, created.id);
   }
 
-  const edges: WorkflowEdge[] = architecture.edges
+  const edges = mapEdges(arch.edges, keyToId);
+  await prisma.workflow.update({
+    where: { id: workflow.id },
+    data: { edges: edges as unknown as object },
+  });
+  return workflow.id;
+}
+
+function mapEdges(
+  edges: { from: string; to: string }[],
+  keyToId: Map<string, string>,
+): WorkflowEdge[] {
+  return edges
     .map((e) => {
       const source = keyToId.get(e.from);
       const target = keyToId.get(e.to);
@@ -151,11 +166,19 @@ export async function generateWorkflow(
         : null;
     })
     .filter((e): e is WorkflowEdge => e !== null);
+}
 
-  await prisma.workflow.update({
-    where: { id: workflow.id },
-    data: { edges: edges as unknown as object },
-  });
+export async function generateWorkflow(
+  ideaInput: string,
+): Promise<{ ok: boolean; id?: string; ai?: boolean; error?: string }> {
+  const user = await requireUser();
+  const idea = ideaInput.trim();
+  if (idea.length < 3) {
+    return { ok: false, error: "Опишите идею подробнее, Архитектор." };
+  }
+
+  const { architecture, ai } = await generateArchitecture(idea);
+  const id = await persistArchitecture(user.id, architecture);
 
   await prisma.activity
     .create({
@@ -163,7 +186,7 @@ export async function generateWorkflow(
         userId: user.id,
         type: "workflow.generate",
         entity: "workflow",
-        entityId: workflow.id,
+        entityId: id,
         meta: { idea: idea.slice(0, 200), ai },
       },
     })
@@ -171,7 +194,130 @@ export async function generateWorkflow(
 
   revalidatePath("/workflow");
   revalidatePath("/dashboard");
-  return { ok: true, id: workflow.id, ai };
+  return { ok: true, id, ai };
+}
+
+export async function exportWorkflow(id: string): Promise<{
+  ok: boolean;
+  name?: string;
+  json?: string;
+  markdown?: string;
+}> {
+  const detail = await getWorkflow(id);
+  if (!detail) return { ok: false };
+
+  const idToKey = new Map(detail.nodes.map((n) => [n.id, n.type + "_" + n.id.slice(-4)]));
+  const data: Interchange = {
+    apolloFlow: 1,
+    name: detail.name,
+    description: detail.description ?? "",
+    nodes: detail.nodes.map((n) => ({
+      key: idToKey.get(n.id)!,
+      type: n.type as Interchange["nodes"][number]["type"],
+      label: n.label,
+      description: n.description,
+      tech: n.tech,
+      tasks: n.tasks,
+    })),
+    edges: detail.edges
+      .map((e) => ({ from: idToKey.get(e.source), to: idToKey.get(e.target) }))
+      .filter((e): e is { from: string; to: string } => !!e.from && !!e.to),
+  };
+  return {
+    ok: true,
+    name: detail.name,
+    json: toJsonExport(data),
+    markdown: toMarkdownExport(data),
+  };
+}
+
+export async function importArchitecture(input: {
+  text: string;
+  mergeInto?: string;
+}): Promise<{ ok: boolean; id?: string; ai?: boolean; error?: string }> {
+  const user = await requireUser();
+  const text = input.text.trim();
+  if (text.length < 2) return { ok: false, error: "Пусто — вставьте схему или текст." };
+
+  // JSON-first (our own export round-trips losslessly), else AI-normalize.
+  let arch: GeneratedArchitecture | Interchange | null = parseInterchange(text);
+  let ai = false;
+  if (!arch) {
+    const res = await architectureFromText(text);
+    if (res) {
+      arch = res.architecture;
+      ai = true;
+    }
+  }
+  if (!arch) {
+    return { ok: false, error: "Не удалось распознать схему. Проверьте формат." };
+  }
+
+  if (input.mergeInto) {
+    const id = await mergeIntoWorkflow(user.id, input.mergeInto, arch);
+    if (!id) return { ok: false, error: "Текущая схема не найдена." };
+    revalidatePath("/workflow");
+    return { ok: true, id, ai };
+  }
+
+  const id = await persistArchitecture(user.id, arch);
+  await prisma.activity
+    .create({
+      data: {
+        userId: user.id,
+        type: "workflow.import",
+        entity: "workflow",
+        entityId: id,
+        meta: { ai },
+      },
+    })
+    .catch(() => undefined);
+  revalidatePath("/workflow");
+  revalidatePath("/dashboard");
+  return { ok: true, id, ai };
+}
+
+async function mergeIntoWorkflow(
+  userId: string,
+  workflowId: string,
+  arch: GeneratedArchitecture | Interchange,
+): Promise<string | null> {
+  const existing = await prisma.workflow.findFirst({
+    where: { id: workflowId, userId },
+    include: { nodes: true },
+  });
+  if (!existing) return null;
+
+  const baseY = existing.nodes.reduce((m, n) => Math.max(m, n.posY), 0) + 200;
+  const keyToId = new Map<string, string>();
+  for (let i = 0; i < arch.nodes.length; i++) {
+    const n = arch.nodes[i];
+    const pos = layout(i, n.type);
+    const created = await prisma.workflowNode.create({
+      data: {
+        workflowId,
+        type: n.type,
+        label: n.label,
+        description: n.description,
+        tech: n.tech,
+        tasks: n.tasks,
+        posX: pos.x,
+        posY: baseY + pos.y,
+        color: blockMeta(n.type).color,
+      },
+    });
+    keyToId.set(n.key, created.id);
+  }
+
+  const prevEdges = Array.isArray(existing.edges)
+    ? (existing.edges as unknown as WorkflowEdge[])
+    : [];
+  const newEdges = mapEdges(arch.edges, keyToId);
+  await prisma.workflow.update({
+    where: { id: workflowId },
+    data: { edges: [...prevEdges, ...newEdges] as unknown as object },
+  });
+  return workflowId;
 }
 
 const saveSchema = z.object({

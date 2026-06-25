@@ -15,6 +15,7 @@ import {
   type WorkflowSummary,
 } from "@/features/workflow/actions";
 import { WorkflowCanvas } from "./workflow-canvas";
+import { ExportDialog, ImportDialog } from "./import-export";
 
 const IDEAS = [
   "CRM для стоматологии",
@@ -74,6 +75,10 @@ export function WorkflowClient({
               ) : null}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <ImportDialog currentId={selected.id} />
+            <ExportDialog workflowId={selected.id} />
+          </div>
         </div>
         <WorkflowCanvas workflow={selected} />
       </div>
@@ -90,6 +95,9 @@ export function WorkflowClient({
             <p className="text-[11px] text-muted-foreground">
               Проект Аполлон спроектирует архитектуру по вашему рабочему стандарту
             </p>
+          </div>
+          <div className="ml-auto">
+            <ImportDialog />
           </div>
         </div>
         <Textarea

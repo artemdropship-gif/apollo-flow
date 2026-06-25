@@ -152,6 +152,33 @@ export function fallbackArchitecture(idea: string): GeneratedArchitecture {
   };
 }
 
+const NORMALIZE_SYSTEM = `Ты — «Проект Аполлон». Тебе дают описание/ТЗ системы (возможно из Claude, в виде текста или markdown). Преобразуй его в архитектуру Apollo-Flow, СОХРАНЯЯ структуру автора — не выдумывай лишние блоки, опирайся на то, что в тексте. Если чего-то не хватает по дефолтному стеку (БД, деплой) — можешь добавить, но не перегружай.
+
+Верни ТОЛЬКО валидный JSON без markdown, по схеме:
+{ "name": "...", "description": "...", "nodes": [ { "key": "fe", "type": "frontend", "label": "...", "description": "...", "tech": "...", "tasks": ["..."] } ], "edges": [ { "from": "fe", "to": "be" } ] }
+Допустимые type: frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment. Текст полей — по-русски.`;
+
+/** Convert arbitrary text/markdown (e.g. Claude output) into our schema. */
+export async function architectureFromText(
+  text: string,
+): Promise<{ architecture: GeneratedArchitecture; ai: boolean } | null> {
+  const messages: ChatMessage[] = [
+    { role: "system", content: NORMALIZE_SYSTEM },
+    { role: "user", content: text.slice(0, 8000) },
+  ];
+  const raw = await chat(messages, { temperature: 0.2, maxTokens: 1400 });
+  if (raw) {
+    try {
+      const parsed = JSON.parse(extractJson(raw)) as Parameters<typeof normalize>[1];
+      const arch = normalize(text.slice(0, 80), parsed);
+      if (arch) return { architecture: arch, ai: true };
+    } catch {
+      // fall through
+    }
+  }
+  return null;
+}
+
 export async function generateArchitecture(
   idea: string,
 ): Promise<{ architecture: GeneratedArchitecture; ai: boolean }> {
