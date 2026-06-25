@@ -62,39 +62,66 @@ interface AnthropicResponse {
 
 export async function chat(
   messages: ChatMessage[],
-  opts?: { temperature?: number; maxTokens?: number },
+  opts?: { temperature?: number; maxTokens?: number; prefill?: string },
 ): Promise<string | null> {
   const token = authToken();
   if (!token) return null;
 
   const { system, turns } = toAnthropicPayload(messages);
+  // Assistant-turn prefill forces the reply to start with the given text — the
+  // reliable way to get strict JSON from a gateway that otherwise nudges the
+  // model toward markdown (Claude Code-style system prompt injection).
+  const outgoing = opts?.prefill
+    ? [...turns, { role: "assistant" as const, content: opts.prefill }]
+    : turns;
 
-  try {
-    const res = await fetch(`${baseUrl()}/v1/messages`, {
-      method: "POST",
-      headers: headers(token),
-      body: JSON.stringify({
-        model: model(),
-        max_tokens: opts?.maxTokens ?? 1024,
-        temperature: opts?.temperature ?? 0.7,
-        ...(system ? { system } : {}),
-        messages: turns,
-      }),
-    });
+  const body = JSON.stringify({
+    model: model(),
+    max_tokens: opts?.maxTokens ?? 1024,
+    temperature: opts?.temperature ?? 0.7,
+    // Some Anthropic-compatible gateways (Claude Code) inject tools and
+    // answer with tool_use blocks instead of text. Force a plain text reply.
+    tool_choice: { type: "none" },
+    ...(system ? { system } : {}),
+    messages: outgoing,
+  });
 
-    if (!res.ok) return null;
+  // One retry: the gateway occasionally returns a transient error (e.g. 429/5xx)
+  // under back-to-back load. A single retry keeps us on the live model instead
+  // of silently dropping to the heuristic fallback.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${baseUrl()}/v1/messages`, {
+        method: "POST",
+        headers: headers(token),
+        body,
+      });
 
-    const data = (await res.json()) as AnthropicResponse;
-    const text = (data.content ?? [])
-      .filter((b) => b.type === "text" && typeof b.text === "string")
-      .map((b) => b.text as string)
-      .join("")
-      .trim();
+      if (!res.ok) {
+        if (attempt === 0 && (res.status === 429 || res.status >= 500)) {
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        return null;
+      }
 
-    return text || null;
-  } catch {
-    return null;
+      const data = (await res.json()) as AnthropicResponse;
+      const text = (data.content ?? [])
+        .filter((b) => b.type === "text" && typeof b.text === "string")
+        .map((b) => b.text as string)
+        .join("")
+        .trim();
+
+      return text || null;
+    } catch {
+      if (attempt === 0) {
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      return null;
+    }
   }
+  return null;
 }
 
 interface StreamEvent {
@@ -124,6 +151,7 @@ export async function* chatStream(
         model: model(),
         max_tokens: opts?.maxTokens ?? 1024,
         temperature: opts?.temperature ?? 0.7,
+        tool_choice: { type: "none" },
         ...(system ? { system } : {}),
         messages: turns,
         stream: true,

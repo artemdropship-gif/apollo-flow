@@ -218,7 +218,7 @@ export async function architectureFromText(
     { role: "system", content: NORMALIZE_SYSTEM },
     { role: "user", content: text.slice(0, 8000) },
   ];
-  const raw = await chat(messages, { temperature: 0.2, maxTokens: 1800 });
+  const raw = await chat(messages, { temperature: 0.2, maxTokens: 8000, prefill: "{" });
   if (raw) {
     try {
       const parsed = JSON.parse(extractJson(raw)) as Parameters<typeof normalize>[1];
@@ -246,7 +246,7 @@ export async function generateArchitecture(
     },
   ];
 
-  const raw = await chat(messages, { temperature: 0.4, maxTokens: 1800 });
+  const raw = await chat(messages, { temperature: 0.4, maxTokens: 8000, prefill: "{" });
   if (raw) {
     try {
       const parsed = JSON.parse(extractJson(raw)) as Parameters<typeof normalize>[1];
