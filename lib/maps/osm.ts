@@ -48,7 +48,104 @@ const NICHE_FILTERS: Record<string, string[]> = {
   отель: ['"tourism"="hotel"'],
   spa: ['"leisure"="spa"', '"shop"="beauty"'],
   "магазин одежды": ['"shop"="clothes"'],
+  бар: ['"amenity"="bar"', '"amenity"="pub"'],
+  пекарня: ['"shop"="bakery"', '"craft"="bakery"'],
+  кондитерская: ['"shop"="confectionery"', '"shop"="pastry"'],
+  аптека: ['"amenity"="pharmacy"', '"healthcare"="pharmacy"'],
+  автомойка: ['"amenity"="car_wash"'],
+  шиномонтаж: ['"shop"="tyres"', '"shop"="car_repair"'],
+  ветклиника: ['"amenity"="veterinary"', '"healthcare"="veterinary"'],
+  массаж: ['"shop"="massage"', '"leisure"="spa"'],
+  тату: ['"shop"="tattoo"'],
 };
+
+/**
+ * Maps common natural-language niche words (synonyms, singular/plural,
+ * professions) to a canonical key in NICHE_FILTERS, so users get real tag-based
+ * results instead of the slow, usually-empty fuzzy name fallback.
+ */
+const NICHE_SYNONYMS: Record<string, string> = {
+  кофейня: "кафе",
+  кофейни: "кафе",
+  кофе: "кафе",
+  кафетерий: "кафе",
+  столовая: "кафе",
+  бистро: "кафе",
+  рестораны: "ресторан",
+  ресторанчик: "ресторан",
+  пиццерии: "пиццерия",
+  пицца: "пиццерия",
+  стоматолог: "стоматология",
+  "стоматологическая клиника": "стоматология",
+  "зубная клиника": "стоматология",
+  дантист: "стоматология",
+  парикмахерская: "барбершоп",
+  парикмахер: "барбершоп",
+  барбер: "барбершоп",
+  "ногтевая студия": "маникюрный салон",
+  маникюр: "маникюрный салон",
+  "салон ногтей": "маникюрный салон",
+  "ногтевой сервис": "маникюрный салон",
+  косметолог: "косметология",
+  "косметологическая клиника": "косметология",
+  "салон спа": "spa",
+  спа: "spa",
+  "спа салон": "spa",
+  фитнес: "фитнес клуб",
+  "тренажерный зал": "фитнес клуб",
+  "спортзал": "фитнес клуб",
+  зал: "фитнес клуб",
+  юристы: "юрист",
+  адвокат: "юрист",
+  "юридическая компания": "юрист",
+  "юридическая фирма": "юрист",
+  "агентство недвижимости": "недвижимость",
+  риелтор: "недвижимость",
+  риэлтор: "недвижимость",
+  клиника: "частная клиника",
+  "медицинский центр": "частная клиника",
+  "медцентр": "частная клиника",
+  гостиница: "отель",
+  хостел: "отель",
+  "магазин цветов": "цветочный магазин",
+  цветы: "цветочный магазин",
+  флорист: "цветочный магазин",
+  "автомастерская": "автосервис",
+  "ремонт авто": "автосервис",
+  сто: "автосервис",
+  "магазин парфюмерии": "магазин духов",
+  парфюмерия: "магазин духов",
+  духи: "магазин духов",
+  "магазин косметики": "косметология",
+  "детский сад": "детский центр",
+  "развивающий центр": "детский центр",
+  "магазин одежда": "магазин одежды",
+  одежда: "магазин одежды",
+  бутик: "магазин одежды",
+  бары: "бар",
+  паб: "бар",
+  булочная: "пекарня",
+  ветеринар: "ветклиника",
+  "ветеринарная клиника": "ветклиника",
+  "тату салон": "тату",
+  "тату студия": "тату",
+};
+
+/** Resolves a free-form niche string to a canonical NICHE_FILTERS key, if any. */
+function resolveNicheKey(niche: string): string | null {
+  const key = niche.trim().toLowerCase().replace(/ё/g, "е");
+  if (!key) return null;
+  if (NICHE_FILTERS[key]) return key;
+  if (NICHE_SYNONYMS[key]) return NICHE_SYNONYMS[key];
+  // Substring match: e.g. "лучшая стоматология" -> "стоматология".
+  for (const k of Object.keys(NICHE_FILTERS)) {
+    if (key.includes(k)) return k;
+  }
+  for (const s of Object.keys(NICHE_SYNONYMS)) {
+    if (key.includes(s)) return NICHE_SYNONYMS[s];
+  }
+  return null;
+}
 
 interface GeoArea {
   areaId: number;
@@ -89,8 +186,8 @@ async function geocodeCity(city: string): Promise<GeoArea | null> {
 }
 
 function buildQuery(areaId: number, niche: string, limit: number): string {
-  const key = niche.trim().toLowerCase();
-  const filters = NICHE_FILTERS[key];
+  const key = resolveNicheKey(niche);
+  const filters = key ? NICHE_FILTERS[key] : undefined;
   let selectors: string[];
 
   if (filters && filters.length) {
