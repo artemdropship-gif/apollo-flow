@@ -1,19 +1,33 @@
-import { Workflow } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
+import {
+  getWorkflow,
+  getWorkflowLeads,
+  getWorkflows,
+  type WorkflowDetail,
+} from "@/features/workflow/actions";
+import { WorkflowClient } from "@/features/workflow/components/workflow-client";
 
-export default function WorkflowPage() {
+export default async function WorkflowPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>;
+}) {
+  const { id } = await searchParams;
+  const [workflows, selected, leads] = await Promise.all([
+    getWorkflows(),
+    id ? getWorkflow(id) : Promise.resolve<WorkflowDetail | null>(null),
+    id ? Promise.resolve([]) : getWorkflowLeads(),
+  ]);
+
   return (
     <div className="mx-auto max-w-6xl">
-      <PageHeader
-        title="Workflow Builder"
-        description="Интерактивный конструктор архитектуры проектов"
-      />
-      <EmptyState
-        icon={Workflow}
-        title="Конструктор архитектуры скоро будет здесь"
-        description="Стройте схемы из блоков (Frontend, Backend, API, БД, AI и др.) с drag-and-drop, или опишите идею — AI-ассистент сам предложит архитектуру и стек."
-      />
+      {!selected && (
+        <PageHeader
+          title="Workflow Builder"
+          description="Опишите идею — Проект Аполлон спроектирует архитектуру. Или соберите схему из блоков вручную."
+        />
+      )}
+      <WorkflowClient workflows={workflows} selected={selected} leads={leads} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Workflow } from "lucide-react";
+import { ApolloCore } from "@/components/layout/apollo-core";
 import {
   Sidebar,
   SidebarContent,
@@ -28,11 +28,9 @@ export function AppSidebar({ user }: { user: SessionUser }) {
           href="/dashboard"
           className="flex items-center gap-2.5 px-2 py-1.5"
         >
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/30">
-            <Workflow className="size-5" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight">
-            Apollo<span className="text-gradient">Flow</span>
+          <ApolloCore className="size-8 shrink-0" />
+          <span className="font-mono text-base font-semibold tracking-tight">
+            Apollo<span className="text-muted-foreground">Flow</span>
           </span>
         </Link>
       </SidebarHeader>

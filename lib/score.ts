@@ -62,3 +62,40 @@ export function scorePriority(score: number): {
   if (score >= 40) return { label: "Средний", color: "#f59e0b" };
   return { label: "Низкий", color: "#22c55e" };
 }
+
+export type Temperature = "EXPLOSIVE" | "HOT" | "WARM" | "COLD";
+
+export interface TemperatureInfo {
+  key: Temperature;
+  label: string;
+  color: string;
+}
+
+/**
+ * Buying-intent "temperature" of a lead. Driven by the lead score, but a
+ * missing or broken website bumps an already-strong lead to «взрывной» —
+ * those businesses most acutely need exactly the product we sell.
+ */
+export function leadTemperature(
+  score: number,
+  signals?: { noWebsite?: boolean; broken?: boolean },
+): TemperatureInfo {
+  const urgentSite = Boolean(signals?.noWebsite || signals?.broken);
+  if (score >= 75 && urgentSite)
+    return { key: "EXPLOSIVE", label: "Взрывной", color: "#ef4444" };
+  if (score >= 65) return { key: "HOT", label: "Горячий", color: "#f97316" };
+  if (score >= 40) return { key: "WARM", label: "Тёплый", color: "#f59e0b" };
+  return { key: "COLD", label: "Холодный", color: "#3b82f6" };
+}
+
+/** Derive website signals from a lead's stored score reasons. */
+export function siteSignalsFromReasons(
+  reasons: { reason: string }[] | null | undefined,
+  website: string | null | undefined,
+): { noWebsite: boolean; broken: boolean } {
+  const text = (reasons ?? []).map((r) => r.reason.toLowerCase());
+  return {
+    noWebsite: !website || text.some((r) => r.includes("нет сайта")),
+    broken: text.some((r) => r.includes("сломан")),
+  };
+}

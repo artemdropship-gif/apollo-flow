@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { saveLead } from "@/features/leads/actions";
 import { ScoreBadge } from "@/features/leads/components/score-badge";
+import { TemperatureBadge } from "@/features/leads/components/temperature-badge";
 import type { LeadCandidate } from "@/features/leads/types";
 
 export function ResultCard({ candidate }: { candidate: LeadCandidate }) {
@@ -48,7 +49,14 @@ export function ResultCard({ candidate }: { candidate: LeadCandidate }) {
               {candidate.websiteStatus}
             </p>
           </div>
-          <ScoreBadge score={candidate.leadScore} />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <TemperatureBadge
+              score={candidate.leadScore}
+              noWebsite={!candidate.audit.hasWebsite}
+              broken={candidate.audit.broken}
+            />
+            <ScoreBadge score={candidate.leadScore} />
+          </div>
         </div>
 
         <div className="space-y-1 text-sm text-muted-foreground">
