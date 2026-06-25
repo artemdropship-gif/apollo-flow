@@ -49,8 +49,8 @@ import {
 import {
   buildProjectPrompt,
   importProjectFromText,
-  PROJECT_IMPORT_TEMPLATE,
 } from "@/features/projects/prompt";
+import { PROJECT_IMPORT_TEMPLATE } from "@/features/projects/prompt-template";
 
 export function ProjectDetailClient({
   project,
