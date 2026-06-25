@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const mono = JetBrains_Mono({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-mono-code",
+});
 
 export const metadata: Metadata = {
   title: "Apollo-Flow — поиск клиентов и управление проектами",
@@ -18,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={mono.variable}
       suppressHydrationWarning
     >
       <body className="antialiased">
