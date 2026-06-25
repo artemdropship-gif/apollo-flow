@@ -7,12 +7,17 @@ const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 const DEFAULT_MODEL = "openai/gpt-oss-120b:free";
 
+// Strong, free models on OpenRouter. The chain is tried in order: if a model
+// is rate-limited / errors / is unavailable, the next one is used automatically.
+// Ordered for both strength and provider diversity so one provider's limit
+// doesn't take the assistant down. Verified responding as of 2026-06.
 const FALLBACK_MODELS = [
   "openai/gpt-oss-120b:free",
-  "openai/gpt-oss-20b:free",
-  "google/gemma-4-31b-it:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
   "qwen/qwen3-next-80b-a3b-instruct:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemma-4-31b-it:free",
+  "openai/gpt-oss-20b:free",
 ];
 
 export function aiEnabled(): boolean {
