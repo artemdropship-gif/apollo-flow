@@ -25,6 +25,8 @@ import {
 } from "@/features/leads/actions";
 import { MessageDialog } from "@/features/leads/components/message-dialog";
 import { ScoreBadge } from "@/features/leads/components/score-badge";
+import { TemperatureBadge } from "@/features/leads/components/temperature-badge";
+import { siteSignalsFromReasons } from "@/lib/score";
 import type { SavedLead } from "@/features/leads/types";
 
 export function SavedLeadCard({ lead }: { lead: SavedLead }) {
@@ -32,6 +34,7 @@ export function SavedLeadCard({ lead }: { lead: SavedLead }) {
   const [status, setStatus] = useState<LeadStatus>(lead.status);
   const [comment, setComment] = useState(lead.comment ?? "");
   const [pending, startTransition] = useTransition();
+  const signals = siteSignalsFromReasons(lead.scoreReasons, lead.website);
 
   function changeStatus(next: LeadStatus) {
     setStatus(next);
@@ -73,6 +76,11 @@ export function SavedLeadCard({ lead }: { lead: SavedLead }) {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            <TemperatureBadge
+              score={lead.leadScore}
+              noWebsite={signals.noWebsite}
+              broken={signals.broken}
+            />
             <ScoreBadge score={lead.leadScore} />
             <button
               type="button"
@@ -143,7 +151,13 @@ export function SavedLeadCard({ lead }: { lead: SavedLead }) {
               </option>
             ))}
           </select>
-          <MessageDialog leadId={lead.id} leadName={lead.name} />
+          <MessageDialog
+            leadId={lead.id}
+            leadName={lead.name}
+            phone={lead.phone}
+            email={lead.email}
+            website={lead.website}
+          />
           <Button
             variant="ghost"
             size="sm"

@@ -4,6 +4,8 @@ import { MapPin, Phone, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LEAD_STATUS_MAP } from "@/lib/constants";
 import { ScoreBadge } from "@/features/leads/components/score-badge";
+import { TemperatureBadge } from "@/features/leads/components/temperature-badge";
+import { siteSignalsFromReasons } from "@/lib/score";
 import type { SavedLead } from "@/features/leads/types";
 
 export function PipelineCard({
@@ -18,6 +20,7 @@ export function PipelineCard({
   onDragEnd: () => void;
 }) {
   const accent = LEAD_STATUS_MAP[lead.status]?.color;
+  const signals = siteSignalsFromReasons(lead.scoreReasons, lead.website);
   return (
     <article
       draggable
@@ -64,7 +67,12 @@ export function PipelineCard({
         </div>
       )}
 
-      <div className="mt-2.5 border-t border-border/60 pt-2.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2.5">
+        <TemperatureBadge
+          score={lead.leadScore}
+          noWebsite={signals.noWebsite}
+          broken={signals.broken}
+        />
         <ScoreBadge score={lead.leadScore} />
       </div>
     </article>

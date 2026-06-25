@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { LeadStatus } from "@prisma/client";
-import { Inbox, Star } from "lucide-react";
+import { Flame, Inbox, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -10,21 +10,37 @@ import { LEAD_STATUSES } from "@/lib/constants";
 import { SavedLeadCard } from "@/features/leads/components/saved-lead-card";
 import type { SavedLead } from "@/features/leads/types";
 
-type Filter = "ALL" | "FAVORITE" | LeadStatus;
+type Filter = "ALL" | "FAVORITE" | "HOT" | LeadStatus;
+
+const HOT_THRESHOLD = 65;
 
 export function SavedPanel({ leads }: { leads: SavedLead[] }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
 
+  const hotCount = useMemo(
+    () => leads.filter((l) => l.leadScore >= HOT_THRESHOLD).length,
+    [leads],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter((lead) => {
+    const result = leads.filter((lead) => {
       if (filter === "FAVORITE" && !lead.favorite) return false;
-      if (filter !== "ALL" && filter !== "FAVORITE" && lead.status !== filter)
+      if (filter === "HOT" && lead.leadScore < HOT_THRESHOLD) return false;
+      if (
+        filter !== "ALL" &&
+        filter !== "FAVORITE" &&
+        filter !== "HOT" &&
+        lead.status !== filter
+      )
         return false;
       if (q && !lead.name.toLowerCase().includes(q)) return false;
       return true;
     });
+    // Hottest first when looking at the hot bucket.
+    if (filter === "HOT") result.sort((a, b) => b.leadScore - a.leadScore);
+    return result;
   }, [leads, filter, query]);
 
   if (!leads.length) {
@@ -57,6 +73,15 @@ export function SavedPanel({ leads }: { leads: SavedLead[] }) {
             <Star className="size-3.5" />
             Избранное
           </FilterButton>
+          {hotCount > 0 && (
+            <FilterButton
+              active={filter === "HOT"}
+              onClick={() => setFilter("HOT")}
+            >
+              <Flame className="size-3.5" />
+              Горячие ({hotCount})
+            </FilterButton>
+          )}
           {LEAD_STATUSES.map((s) => {
             const count = leads.filter((l) => l.status === s.value).length;
             if (!count) return null;
