@@ -16,16 +16,41 @@ export interface InterchangeEdge {
   to: string;
 }
 
+export interface InterchangePage {
+  name: string;
+  purpose: string;
+}
+
 export interface Interchange {
   apolloFlow: number;
   name: string;
   description: string;
+  goal: string;
+  pages: InterchangePage[];
+  design: string;
   nodes: InterchangeNode[];
   edges: InterchangeEdge[];
 }
 
 function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function parsePages(value: unknown): InterchangePage[] {
+  if (!Array.isArray(value)) return [];
+  const pages: InterchangePage[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      if (item.trim()) pages.push({ name: item.trim().slice(0, 80), purpose: "" });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      const name = str(o.name).trim();
+      if (name) pages.push({ name: name.slice(0, 80), purpose: str(o.purpose).slice(0, 300) });
+    }
+  }
+  return pages.slice(0, 20);
 }
 
 /** Parse our own JSON interchange. Returns null if it isn't valid. */
@@ -81,6 +106,9 @@ export function parseInterchange(raw: unknown): Interchange | null {
     apolloFlow: INTERCHANGE_VERSION,
     name: str(o.name, "Импортированная схема").slice(0, 120),
     description: str(o.description),
+    goal: str(o.goal),
+    pages: parsePages(o.pages),
+    design: str(o.design),
     nodes,
     edges,
   };
@@ -91,14 +119,20 @@ export function toJsonExport(data: Interchange): string {
 }
 
 const CLAUDE_HEADER = `<!--
-Это архитектура из Apollo-Flow. Можешь дополнить/изменить её.
-Когда закончишь, верни ОБНОВЛЁННУЮ архитектуру ОДНИМ блоком JSON ровно в этой схеме
+Это ГОТОВЫЙ ПРОМТ из Apollo-Flow: рабочий стандарт (база) + ТЗ проекта + архитектура.
+ВЫПОЛНЯЙ СТРОГО по рабочему стандарту и ТЗ ниже. НИЧЕГО ЛИШНЕГО не добавляй
+сверх описанного; недостающее дополняй только по дефолтному стеку стандарта.
+Можешь дополнить/изменить: цель, суть, страницы, дизайн-решения, блоки и связи.
+Когда закончишь, верни ОБНОВЛЁННЫЙ результат ОДНИМ блоком JSON ровно в этой схеме
 (его Apollo-Flow загрузит обратно):
 
 {
   "apolloFlow": 1,
   "name": "название",
-  "description": "1-2 предложения",
+  "description": "суть в 1-2 предложениях",
+  "goal": "цель продукта",
+  "pages": [ { "name": "Главная", "purpose": "что на ней и зачем" } ],
+  "design": "дизайн-решения: стиль, палитра, шрифт, UX",
   "nodes": [
     { "key": "fe", "type": "frontend", "label": "Frontend", "description": "...", "tech": "...", "tasks": ["...", "..."] }
   ],
@@ -108,12 +142,34 @@ const CLAUDE_HEADER = `<!--
 Допустимые type: frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment.
 -->`;
 
-/** Human + Claude-readable spec, with an embedded JSON block for round-tripping. */
-export function toMarkdownExport(data: Interchange): string {
+/**
+ * A self-contained prompt for Claude: the Architect's working standard (base,
+ * verbatim) + the project ТЗ (goal/pages/design) + the architecture + an embedded
+ * JSON block for round-tripping. Pass `standard` to embed the base prompt on top.
+ */
+export function toMarkdownExport(data: Interchange, standard?: string): string {
   const lines: string[] = [];
   lines.push(CLAUDE_HEADER, "");
-  lines.push(`# ${data.name}`, "");
+  if (standard && standard.trim()) {
+    lines.push("# Рабочий стандарт (база — не менять, выполнять по нему)", "");
+    lines.push(standard.trim(), "");
+    lines.push("---", "");
+    lines.push("# ТЗ проекта", "");
+  }
+  lines.push(`## ${data.name}`, "");
   if (data.description) lines.push(data.description, "");
+
+  if (data.goal) lines.push("## Цель", "", data.goal, "");
+
+  if (data.pages.length) {
+    lines.push("## Страницы", "");
+    for (const p of data.pages) {
+      lines.push(p.purpose ? `- **${p.name}** — ${p.purpose}` : `- **${p.name}**`);
+    }
+    lines.push("");
+  }
+
+  if (data.design) lines.push("## Дизайн-решения", "", data.design, "");
 
   const byKey = new Map(data.nodes.map((n) => [n.key, n]));
   lines.push("## Блоки", "");

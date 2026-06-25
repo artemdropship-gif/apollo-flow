@@ -12,6 +12,7 @@ import {
   deleteWorkflow,
   generateWorkflow,
   type WorkflowDetail,
+  type WorkflowLeadOption,
   type WorkflowSummary,
 } from "@/features/workflow/actions";
 import { WorkflowCanvas } from "./workflow-canvas";
@@ -26,19 +27,27 @@ const IDEAS = [
 export function WorkflowClient({
   workflows,
   selected,
+  leads = [],
 }: {
   workflows: WorkflowSummary[];
   selected: WorkflowDetail | null;
+  leads?: WorkflowLeadOption[];
 }) {
   const router = useRouter();
   const [idea, setIdea] = useState("");
+  const [mode, setMode] = useState<"scratch" | "business">("scratch");
+  const [leadId, setLeadId] = useState("");
   const [pending, startTransition] = useTransition();
 
   function generate(text: string) {
     const value = text.trim();
-    if (!value || pending) return;
+    const usingBusiness = mode === "business" && leadId;
+    if ((!value && !usingBusiness) || pending) return;
     startTransition(async () => {
-      const res = await generateWorkflow(value);
+      const res = await generateWorkflow({
+        idea: value,
+        leadId: usingBusiness ? leadId : undefined,
+      });
       if (!res.ok || !res.id) {
         toast.error(res.error ?? "Не удалось сгенерировать");
         return;
@@ -93,12 +102,51 @@ export function WorkflowClient({
           <div>
             <p className="font-mono text-sm font-semibold">Опишите идею</p>
             <p className="text-[11px] text-muted-foreground">
-              Проект Аполлон спроектирует архитектуру по вашему рабочему стандарту
+              Проект Аполлон спроектирует продукт по вашему рабочему стандарту
             </p>
           </div>
           <div className="ml-auto">
             <ImportDialog />
           </div>
+        </div>
+
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            <button
+              type="button"
+              onClick={() => setMode("scratch")}
+              className={`px-2.5 py-1 font-mono text-[10px] ${mode === "scratch" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent"}`}
+            >
+              С нуля
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("business")}
+              className={`px-2.5 py-1 font-mono text-[10px] ${mode === "business" ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent"}`}
+            >
+              Из бизнеса
+            </button>
+          </div>
+          {mode === "business" ? (
+            leads.length ? (
+              <select
+                value={leadId}
+                onChange={(e) => setLeadId(e.target.value)}
+                className="h-7 max-w-xs rounded-md border border-border bg-background px-2 font-mono text-[10px]"
+              >
+                <option value="">Выберите бизнес…</option>
+                {leads.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                Нет сохранённых лидов — сохраните бизнес в «Поиск лидов».
+              </span>
+            )
+          ) : null}
         </div>
         <Textarea
           value={idea}
@@ -106,11 +154,18 @@ export function WorkflowClient({
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) generate(idea);
           }}
-          placeholder="Напр.: CRM для стоматологии с онлайн-записью и напоминаниями"
+          placeholder={
+            mode === "business"
+              ? "Необязательно: что именно сделать для этого бизнеса. Пусто — Аполлон предложит сам."
+              : "Напр.: CRM для стоматологии с онлайн-записью и напоминаниями"
+          }
           className="min-h-20 font-mono text-xs"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Button onClick={() => generate(idea)} disabled={pending || !idea.trim()}>
+          <Button
+            onClick={() => generate(idea)}
+            disabled={pending || (mode === "business" ? !leadId : !idea.trim())}
+          >
             <Sparkles className="size-3.5" />
             {pending ? "Проектирую…" : "Построить архитектуру"}
           </Button>

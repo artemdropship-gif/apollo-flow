@@ -40,6 +40,37 @@ interface NodeMeta {
   tasks: string[];
 }
 
+interface Page {
+  name: string;
+  purpose: string;
+}
+
+interface Brief {
+  description: string;
+  goal: string;
+  design: string;
+  pages: Page[];
+}
+
+function pagesToText(pages: Page[]): string {
+  return pages.map((p) => (p.purpose ? `${p.name} — ${p.purpose}` : p.name)).join("\n");
+}
+
+function textToPages(text: string): Page[] {
+  return text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/\s+[—–-]\s+/);
+      return {
+        name: (parts[0] ?? line).slice(0, 80),
+        purpose: parts.slice(1).join(" — ").slice(0, 300),
+      };
+    })
+    .slice(0, 20);
+}
+
 function toFlowNode(n: WorkflowNodeData): Node<BlockNodeData> {
   return {
     id: n.id,
@@ -79,6 +110,12 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [, forceRender] = useState(0);
+  const [brief, setBrief] = useState<Brief>({
+    description: workflow.description ?? "",
+    goal: workflow.goal,
+    design: workflow.design,
+    pages: workflow.pages,
+  });
 
   const onConnect = useCallback(
     (conn: Connection) =>
@@ -131,6 +168,10 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
     try {
       const res = await saveWorkflowGraph({
         id: workflow.id,
+        description: brief.description,
+        goal: brief.goal,
+        design: brief.design,
+        pages: brief.pages,
         edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
         nodes: nodes.map((n) => {
           const m = metaRef.current[n.id];
@@ -268,7 +309,46 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
             </Button>
           </div>
         ) : (
-          <div className="flex-1 space-y-2 overflow-y-auto p-3">
+          <div className="flex-1 space-y-3 overflow-y-auto p-3">
+            <div className="space-y-2 rounded-md border border-border bg-background/60 p-2">
+              <p className="text-[10px] uppercase text-muted-foreground">ТЗ проекта</p>
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Суть</label>
+                <Textarea
+                  value={brief.description}
+                  onChange={(e) => setBrief((b) => ({ ...b, description: e.target.value }))}
+                  placeholder="О чём продукт в 1-2 предложениях…"
+                  className="min-h-14 font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Цель</label>
+                <Textarea
+                  value={brief.goal}
+                  onChange={(e) => setBrief((b) => ({ ...b, goal: e.target.value }))}
+                  placeholder="Что бизнес/пользователь хочет получить…"
+                  className="min-h-14 font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Страницы (по строке: Название — назначение)</label>
+                <Textarea
+                  value={pagesToText(brief.pages)}
+                  onChange={(e) => setBrief((b) => ({ ...b, pages: textToPages(e.target.value) }))}
+                  placeholder="Главная — услуги и запись&#10;Личный кабинет — история записей"
+                  className="min-h-20 font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-muted-foreground">Дизайн-решения</label>
+                <Textarea
+                  value={brief.design}
+                  onChange={(e) => setBrief((b) => ({ ...b, design: e.target.value }))}
+                  placeholder="Стиль, палитра, шрифт, UX-принципы…"
+                  className="min-h-14 font-mono text-xs"
+                />
+              </div>
+            </div>
             <p className="text-[11px] text-muted-foreground">
               Кликните блок, чтобы отредактировать. Тяните от края к краю, чтобы соединить.
             </p>

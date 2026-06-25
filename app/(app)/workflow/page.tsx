@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/shared/page-header";
 import {
   getWorkflow,
+  getWorkflowLeads,
   getWorkflows,
   type WorkflowDetail,
 } from "@/features/workflow/actions";
@@ -12,9 +13,10 @@ export default async function WorkflowPage({
   searchParams: Promise<{ id?: string }>;
 }) {
   const { id } = await searchParams;
-  const [workflows, selected] = await Promise.all([
+  const [workflows, selected, leads] = await Promise.all([
     getWorkflows(),
     id ? getWorkflow(id) : Promise.resolve<WorkflowDetail | null>(null),
+    id ? Promise.resolve([]) : getWorkflowLeads(),
   ]);
 
   return (
@@ -25,7 +27,7 @@ export default async function WorkflowPage({
           description="Опишите идею — Проект Аполлон спроектирует архитектуру. Или соберите схему из блоков вручную."
         />
       )}
-      <WorkflowClient workflows={workflows} selected={selected} />
+      <WorkflowClient workflows={workflows} selected={selected} leads={leads} />
     </div>
   );
 }

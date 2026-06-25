@@ -1,4 +1,5 @@
 import { chat, type ChatMessage } from "@/lib/ai/openrouter";
+import { buildStandard } from "@/lib/ai/build-standard";
 import { BLOCKS, isBlockType, type BlockType } from "@/lib/workflow/blocks";
 
 export interface GeneratedNode {
@@ -15,40 +16,56 @@ export interface GeneratedEdge {
   to: string;
 }
 
+/** A page/screen of the product (часть продуктового брифа). */
+export interface GeneratedPage {
+  name: string;
+  purpose: string;
+}
+
 export interface GeneratedArchitecture {
   name: string;
+  /** Суть/краткое описание продукта. */
   description: string;
+  /** Цель — что бизнес хочет получить. */
+  goal: string;
+  /** Страницы/экраны продукта. */
+  pages: GeneratedPage[];
+  /** Дизайн-решения: стиль, палитра, шрифт, UX-принципы. */
+  design: string;
   nodes: GeneratedNode[];
   edges: GeneratedEdge[];
 }
 
-const SYSTEM = `Ты — «Проект Аполлон», ИИ-архитектор внутри Apollo-Flow. К пользователю обращаешься «Архитектор».
-
-Тебе дают идею продукта. Спроектируй архитектуру СТРОГО по рабочему стандарту Архитектора:
-
-Дефолтный стек (по умолчанию):
-- Frontend: Next.js 15 (App Router) + React + TypeScript + Tailwind + framer-motion + shadcn/ui
-- Backend: Next.js Server Actions / API Routes
-- БД: PostgreSQL (Neon, pooled) + Prisma
-- Деплой: Vercel (+ Vercel Blob для файлов), CI: GitHub Actions
-- Auth: Better Auth
-- AI: OpenRouter (только бесплатные модели) + Vercel AI SDK
-
-Сторонние интеграции (платежи Stripe/ЮKassa, внешние API, аналитика и т.п.) добавляй как блок ТОЛЬКО если идея явно их требует, и помечай в tech, что подключается по команде.
-
-Доступные типы блоков (type): frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment.
-
-Верни ТОЛЬКО валидный JSON без markdown, по схеме:
-{
-  "name": "краткое название архитектуры",
-  "description": "1-2 предложения",
+const SCHEMA = `{
+  "name": "краткое название продукта",
+  "description": "суть продукта в 1-2 предложениях",
+  "goal": "цель: что бизнес/пользователь хочет получить",
+  "pages": [ { "name": "Главная", "purpose": "что на ней и зачем" } ],
+  "design": "дизайн-решения: стиль, палитра, шрифт, UX-принципы",
   "nodes": [
     { "key": "fe", "type": "frontend", "label": "Frontend", "description": "...", "tech": "Next.js, Tailwind, shadcn/ui", "tasks": ["...", "..."] }
   ],
   "edges": [ { "from": "fe", "to": "be" } ]
-}
+}`;
 
-Правила: 4-8 блоков; key — короткий уникальный идентификатор (латиница); tasks — 2-4 конкретных пункта; edges описывают поток данных. Текст полей — по-русски. Никаких комментариев и текста вне JSON.`;
+function systemPrompt(): string {
+  const std = buildStandard();
+  const standardBlock = std
+    ? `\n\nРАБОЧИЙ СТАНДАРТ АРХИТЕКТОРА (канон — строй строго по нему, это его готовый рабочий промт):\n"""\n${std}\n"""`
+    : "";
+  return `Ты — «Проект Аполлон», ИИ-архитектор внутри Apollo-Flow. К пользователю обращаешься «Архитектор».
+
+Тебе дают идею продукта. Спроектируй продукт и его архитектуру СТРОГО по рабочему стандарту Архитектора (ниже): дефолтный стек по умолчанию, сторонние интеграции — только если идея явно их требует (помечай в tech, что подключается по команде).${standardBlock}
+
+Кроме архитектуры (блоки + связи) опиши ПРОДУКТ: цель, суть, страницы/экраны и дизайн-решения — это то, что помогает Архитектору структурировать продукт, а не только код.
+
+Доступные типы блоков (type): frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment.
+
+Верни ТОЛЬКО валидный JSON без markdown, по схеме:
+${SCHEMA}
+
+Правила: 4-8 блоков; 3-7 страниц; key — короткий уникальный идентификатор (латиница); tasks — 2-4 конкретных пункта; edges описывают поток данных. Текст полей — по-русски. Никаких комментариев и текста вне JSON.`;
+}
 
 function extractJson(raw: string): string {
   let s = raw.trim();
@@ -73,9 +90,34 @@ function str(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
+function parsePages(value: unknown): GeneratedPage[] {
+  if (!Array.isArray(value)) return [];
+  const pages: GeneratedPage[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      if (item.trim()) pages.push({ name: item.trim().slice(0, 80), purpose: "" });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      const name = str(o.name).trim();
+      if (name) pages.push({ name: name.slice(0, 80), purpose: str(o.purpose).slice(0, 300) });
+    }
+  }
+  return pages.slice(0, 20);
+}
+
 function normalize(
   idea: string,
-  parsed: { name?: unknown; description?: unknown; nodes?: unknown; edges?: unknown },
+  parsed: {
+    name?: unknown;
+    description?: unknown;
+    goal?: unknown;
+    pages?: unknown;
+    design?: unknown;
+    nodes?: unknown;
+    edges?: unknown;
+  },
 ): GeneratedArchitecture | null {
   if (!Array.isArray(parsed.nodes) || parsed.nodes.length === 0) return null;
 
@@ -111,6 +153,9 @@ function normalize(
   return {
     name: str(parsed.name, `Архитектура: ${idea}`).slice(0, 120),
     description: str(parsed.description),
+    goal: str(parsed.goal),
+    pages: parsePages(parsed.pages),
+    design: str(parsed.design),
     nodes,
     edges,
   };
@@ -147,15 +192,22 @@ export function fallbackArchitecture(idea: string): GeneratedArchitecture {
   return {
     name: `Архитектура: ${trimmed}`.slice(0, 120),
     description: "Базовая схема на дефолтном стеке Архитектора.",
+    goal: trimmed,
+    pages: [
+      { name: "Главная", purpose: "Точка входа: суть продукта и призыв к действию." },
+      { name: "Личный кабинет", purpose: "Данные и действия пользователя после входа." },
+    ],
+    design:
+      "Минимализм в стиле Vercel: тёмный фон, тонкие границы, моноширинный шрифт, цвет — только для данных.",
     nodes: base,
     edges,
   };
 }
 
-const NORMALIZE_SYSTEM = `Ты — «Проект Аполлон». Тебе дают описание/ТЗ системы (возможно из Claude, в виде текста или markdown). Преобразуй его в архитектуру Apollo-Flow, СОХРАНЯЯ структуру автора — не выдумывай лишние блоки, опирайся на то, что в тексте. Если чего-то не хватает по дефолтному стеку (БД, деплой) — можешь добавить, но не перегружай.
+const NORMALIZE_SYSTEM = `Ты — «Проект Аполлон». Тебе дают описание/ТЗ системы (возможно из Claude, в виде текста или markdown). Преобразуй его в продукт+архитектуру Apollo-Flow, СОХРАНЯЯ структуру автора — не выдумывай лишние блоки, опирайся на то, что в тексте. Вытащи цель, суть, страницы и дизайн-решения из текста, если они там есть; чего нет по дефолтному стеку (БД, деплой) — можешь добавить, но не перегружай.
 
 Верни ТОЛЬКО валидный JSON без markdown, по схеме:
-{ "name": "...", "description": "...", "nodes": [ { "key": "fe", "type": "frontend", "label": "...", "description": "...", "tech": "...", "tasks": ["..."] } ], "edges": [ { "from": "fe", "to": "be" } ] }
+${SCHEMA}
 Допустимые type: frontend, backend, api, database, ai, auth, payments, storage, integrations, deployment. Текст полей — по-русски.`;
 
 /** Convert arbitrary text/markdown (e.g. Claude output) into our schema. */
@@ -166,7 +218,7 @@ export async function architectureFromText(
     { role: "system", content: NORMALIZE_SYSTEM },
     { role: "user", content: text.slice(0, 8000) },
   ];
-  const raw = await chat(messages, { temperature: 0.2, maxTokens: 1400 });
+  const raw = await chat(messages, { temperature: 0.2, maxTokens: 1800 });
   if (raw) {
     try {
       const parsed = JSON.parse(extractJson(raw)) as Parameters<typeof normalize>[1];
@@ -181,13 +233,20 @@ export async function architectureFromText(
 
 export async function generateArchitecture(
   idea: string,
+  businessContext?: string,
 ): Promise<{ architecture: GeneratedArchitecture; ai: boolean }> {
+  const business = businessContext?.trim()
+    ? `\n\nДанные существующего бизнеса (проектируй продукт ПОД него — что ему продать/сделать):\n${businessContext.trim()}`
+    : "";
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM },
-    { role: "user", content: `Идея: ${idea}\n\nДоступные типы блоков: ${BLOCKS.map((b) => b.type).join(", ")}.` },
+    { role: "system", content: systemPrompt() },
+    {
+      role: "user",
+      content: `Идея: ${idea}${business}\n\nДоступные типы блоков: ${BLOCKS.map((b) => b.type).join(", ")}.`,
+    },
   ];
 
-  const raw = await chat(messages, { temperature: 0.4, maxTokens: 1200 });
+  const raw = await chat(messages, { temperature: 0.4, maxTokens: 1800 });
   if (raw) {
     try {
       const parsed = JSON.parse(extractJson(raw)) as Parameters<typeof normalize>[1];

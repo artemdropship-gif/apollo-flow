@@ -6,7 +6,9 @@ import {
   architectureFromText,
   generateArchitecture,
   type GeneratedArchitecture,
+  type GeneratedPage,
 } from "@/lib/ai/architecture";
+import { buildStandard } from "@/lib/ai/build-standard";
 import { blockMeta, isBlockType } from "@/lib/workflow/blocks";
 import {
   parseInterchange,
@@ -48,8 +50,29 @@ export interface WorkflowDetail {
   id: string;
   name: string;
   description: string | null;
+  goal: string;
+  pages: GeneratedPage[];
+  design: string;
   nodes: WorkflowNodeData[];
   edges: WorkflowEdge[];
+}
+
+function readPages(value: unknown): GeneratedPage[] {
+  if (!Array.isArray(value)) return [];
+  const out: GeneratedPage[] = [];
+  for (const item of value) {
+    if (item && typeof item === "object") {
+      const o = item as Record<string, unknown>;
+      const name = typeof o.name === "string" ? o.name : "";
+      if (name.trim()) {
+        out.push({
+          name: name.slice(0, 80),
+          purpose: typeof o.purpose === "string" ? o.purpose.slice(0, 300) : "",
+        });
+      }
+    }
+  }
+  return out;
 }
 
 /** Lay generated blocks out in tidy columns by architectural tier. */
@@ -100,6 +123,9 @@ export async function getWorkflow(id: string): Promise<WorkflowDetail | null> {
     id: w.id,
     name: w.name,
     description: w.description,
+    goal: w.goal ?? "",
+    pages: readPages(w.pages),
+    design: w.design ?? "",
     nodes: w.nodes.map((n) => ({
       id: n.id,
       type: n.type,
@@ -122,7 +148,14 @@ async function persistArchitecture(
   arch: GeneratedArchitecture | Interchange,
 ): Promise<string> {
   const workflow = await prisma.workflow.create({
-    data: { userId, name: arch.name, description: arch.description },
+    data: {
+      userId,
+      name: arch.name,
+      description: arch.description,
+      goal: "goal" in arch ? arch.goal : null,
+      pages: "pages" in arch ? (arch.pages as unknown as object) : undefined,
+      design: "design" in arch ? arch.design : null,
+    },
   });
 
   const keyToId = new Map<string, string>();
@@ -168,16 +201,60 @@ function mapEdges(
     .filter((e): e is WorkflowEdge => e !== null);
 }
 
-export async function generateWorkflow(
-  ideaInput: string,
-): Promise<{ ok: boolean; id?: string; ai?: boolean; error?: string }> {
+export interface WorkflowLeadOption {
+  id: string;
+  label: string;
+}
+
+/** Saved leads offered as a business context source for generation. */
+export async function getWorkflowLeads(): Promise<WorkflowLeadOption[]> {
   const user = await requireUser();
-  const idea = ideaInput.trim();
+  const leads = await prisma.lead.findMany({
+    where: { userId: user.id },
+    orderBy: [{ leadScore: "desc" }, { createdAt: "desc" }],
+    select: { id: true, name: true, niche: true, city: true, leadScore: true },
+    take: 100,
+  });
+  return leads.map((l) => ({
+    id: l.id,
+    label: [l.name, l.niche, l.city].filter(Boolean).join(" · ") + ` · ${l.leadScore}`,
+  }));
+}
+
+async function businessContext(userId: string, leadId: string): Promise<string | null> {
+  const l = await prisma.lead.findFirst({ where: { id: leadId, userId } });
+  if (!l) return null;
+  const parts = [
+    `Название: ${l.name}`,
+    l.niche ? `Ниша: ${l.niche}` : null,
+    l.city ? `Город: ${l.city}` : null,
+    l.website ? `Сайт: ${l.website}` : "Сайта нет",
+    l.websiteStatus ? `Статус сайта: ${l.websiteStatus}` : null,
+    `Lead score: ${l.leadScore}`,
+    l.aiRecommendations ? `Что улучшить: ${l.aiRecommendations.slice(0, 600)}` : null,
+  ];
+  return parts.filter(Boolean).join("\n");
+}
+
+export async function generateWorkflow(input: {
+  idea: string;
+  leadId?: string;
+}): Promise<{ ok: boolean; id?: string; ai?: boolean; error?: string }> {
+  const user = await requireUser();
+  let idea = input.idea.trim();
+
+  let context: string | null = null;
+  if (input.leadId) {
+    context = await businessContext(user.id, input.leadId);
+    if (!context) return { ok: false, error: "Бизнес не найден." };
+    if (idea.length < 3) idea = "Продукт/сайт для этого бизнеса, который ему стоит сделать.";
+  }
+
   if (idea.length < 3) {
     return { ok: false, error: "Опишите идею подробнее, Архитектор." };
   }
 
-  const { architecture, ai } = await generateArchitecture(idea);
+  const { architecture, ai } = await generateArchitecture(idea, context ?? undefined);
   const id = await persistArchitecture(user.id, architecture);
 
   await prisma.activity
@@ -187,7 +264,7 @@ export async function generateWorkflow(
         type: "workflow.generate",
         entity: "workflow",
         entityId: id,
-        meta: { idea: idea.slice(0, 200), ai },
+        meta: { idea: idea.slice(0, 200), ai, leadId: input.leadId ?? null },
       },
     })
     .catch(() => undefined);
@@ -211,6 +288,9 @@ export async function exportWorkflow(id: string): Promise<{
     apolloFlow: 1,
     name: detail.name,
     description: detail.description ?? "",
+    goal: detail.goal,
+    pages: detail.pages,
+    design: detail.design,
     nodes: detail.nodes.map((n) => ({
       key: idToKey.get(n.id)!,
       type: n.type as Interchange["nodes"][number]["type"],
@@ -227,7 +307,7 @@ export async function exportWorkflow(id: string): Promise<{
     ok: true,
     name: detail.name,
     json: toJsonExport(data),
-    markdown: toMarkdownExport(data),
+    markdown: toMarkdownExport(data, buildStandard()),
   };
 }
 
@@ -322,6 +402,14 @@ async function mergeIntoWorkflow(
 
 const saveSchema = z.object({
   id: z.string().min(1),
+  name: z.string().max(120).optional(),
+  description: z.string().max(2000).optional(),
+  goal: z.string().max(2000).optional(),
+  design: z.string().max(2000).optional(),
+  pages: z
+    .array(z.object({ name: z.string().max(80), purpose: z.string().max(300) }))
+    .max(20)
+    .optional(),
   edges: z
     .array(z.object({ id: z.string(), source: z.string(), target: z.string() }))
     .max(100),
@@ -370,7 +458,14 @@ export async function saveWorkflowGraph(
     ),
     prisma.workflow.update({
       where: { id: data.id },
-      data: { edges: data.edges as unknown as object },
+      data: {
+        edges: data.edges as unknown as object,
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.goal !== undefined ? { goal: data.goal } : {}),
+        ...(data.design !== undefined ? { design: data.design } : {}),
+        ...(data.pages !== undefined ? { pages: data.pages as unknown as object } : {}),
+      },
     }),
   ]);
 

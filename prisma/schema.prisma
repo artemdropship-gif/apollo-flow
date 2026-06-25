@@ -134,6 +134,9 @@ model Workflow {
   id          String         @id @default(cuid())
   name        String
   description String?
+  goal        String?
+  pages       Json?
+  design      String?
   edges       Json?
   viewport    Json?
   userId      String
