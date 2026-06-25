@@ -6,6 +6,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { AssistantBar } from "@/features/assistant/components/assistant-bar";
 import { NAV_ITEMS } from "@/lib/constants";
 import { useCommandStore } from "@/stores/command";
 
@@ -22,22 +23,22 @@ export function Topbar() {
   const setOpen = useCommandStore((s) => s.setOpen);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-background px-4">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background px-4">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-1 h-5" />
-      <h1 className="text-sm font-semibold">{title}</h1>
-      <div className="ml-auto flex items-center gap-2">
+      <h1 className="hidden shrink-0 text-sm font-semibold md:block">{title}</h1>
+      <div className="flex flex-1 justify-center">
+        <AssistantBar />
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => setOpen(true)}
-          className="gap-2 text-muted-foreground"
+          aria-label="Поиск (⌘K)"
+          className="text-muted-foreground"
         >
           <Search className="size-4" />
-          <span className="hidden sm:inline">Поиск...</span>
-          <kbd className="ml-2 hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] sm:inline-flex">
-            ⌘K
-          </kbd>
         </Button>
         <ThemeToggle />
       </div>
