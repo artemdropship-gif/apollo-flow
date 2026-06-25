@@ -88,27 +88,28 @@ undecryptable. Plan a re-encryption migration before rotating in production.
 
 ---
 
-## 5. AI — OpenRouter (free models)
+## 5. AI — Claude via Anthropic-compatible gateway
 
-AI features (audit reasoning, message generation, workflow assistant) call
-**OpenRouter** using free models only. If no key is set, the app falls back to a
-built-in heuristic (no external calls), so it still runs without a key.
+AI features (audit reasoning, message generation, workflow assistant, the
+architecture generator) call an **Anthropic-compatible endpoint** — the same
+setup as the OpenClaw config: a base URL + Bearer token, Claude as the model.
+The default gateway is `https://aiprimetech.io`. If no token is set, the app
+falls back to a built-in heuristic (no external calls), so it still runs without
+a key.
 
 | Env var | Purpose |
 | --- | --- |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
-| `OPENROUTER_MODEL` | Primary model (default `google/gemini-2.0-flash-exp:free`) |
+| `ANTHROPIC_BASE_URL` | Gateway base URL (default `https://aiprimetech.io`) |
+| `ANTHROPIC_AUTH_TOKEN` | Bearer token for the gateway (falls back to `ANTHROPIC_API_KEY`) |
+| `ANTHROPIC_MODEL` | Model (default `claude-sonnet-4-6`) |
 
-**How to get a key:** https://openrouter.ai/keys → Create Key. Free models
-include Gemini 2.5 Flash (Free), DeepSeek Chat, Qwen, Llama 3.3. Fallback model
-order is configured in `lib/ai/openrouter.ts`.
+The provider client lives in `lib/ai/anthropic.ts` and exposes `chat()`
+(non-streaming, used by the architecture generator and message drafts) and
+`chatStream()` (token-by-token SSE, used by the workflow assistant).
 
-**Where the key lives:** This repo is **public**, so the key is **never
-committed**. It is stored in the **Devin secrets store (org scope)** under the
-name `OPENROUTER_API_KEY` and is auto-injected as an env var in Devin sessions
-for this org. For local dev, put it in `.env` (gitignored). A new account that
-does not share this org's Devin secrets must add its own key once via
-https://openrouter.ai/keys.
+**Where the key lives:** This repo is **public**, so the token is **never
+committed**. For local dev, put it in `.env` (gitignored). To use the official
+Anthropic API instead of the gateway, set `ANTHROPIC_BASE_URL=https://api.anthropic.com`.
 
 ---
 

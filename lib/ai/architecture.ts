@@ -1,4 +1,4 @@
-import { chat, type ChatMessage } from "@/lib/ai/openrouter";
+import { chat, type ChatMessage } from "@/lib/ai/anthropic";
 import { buildStandard } from "@/lib/ai/build-standard";
 import { BLOCKS, isBlockType, type BlockType } from "@/lib/workflow/blocks";
 

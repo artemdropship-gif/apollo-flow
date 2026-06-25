@@ -1,6 +1,6 @@
 "use server";
 
-import { chat, type ChatMessage } from "@/lib/ai/openrouter";
+import { chat, type ChatMessage } from "@/lib/ai/anthropic";
 import { ASSISTANT_SYSTEM_PROMPT as SYSTEM_PROMPT } from "@/features/assistant/prompt";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -37,7 +37,7 @@ export async function askApollo(
   if (!reply) {
     return {
       ok: false,
-      text: "Архитектор, сейчас не получается связаться с моделью (возможно, лимит бесплатной модели). Попробуйте ещё раз через несколько секунд.",
+      text: "Архитектор, сейчас не получается связаться с моделью. Попробуйте ещё раз через несколько секунд.",
     };
   }
 
