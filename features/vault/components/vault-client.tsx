@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { VAULT_CATEGORIES } from "@/lib/constants";
 import type { ProjectOption } from "@/features/projects/actions";
 import {
   createVaultItem,
@@ -39,19 +40,6 @@ import {
   type VaultItemInput,
   type VaultItemView,
 } from "@/features/vault/actions";
-
-const VAULT_CATEGORIES = [
-  "GitHub",
-  "Vercel",
-  "Домен",
-  "Хостинг",
-  "API-ключ",
-  "База данных",
-  "Почта",
-  "Соцсеть",
-  "Документ",
-  "Другое",
-];
 
 function emptyForm(): VaultItemInput {
   return {
