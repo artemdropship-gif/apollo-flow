@@ -2,6 +2,8 @@
   "name": "apollo-flow",
   "version": "0.1.0",
   "private": true,
+  "description": "Apollo-Flow — поиск клиентов и AI-конструктор архитектуры",
+  "author": "Apollo-Flow",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -9,7 +11,58 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "desktop:prepare": "next build && node scripts/desktop-prepare.js",
+    "desktop:start": "electron electron/main.js",
+    "desktop:build:linux": "npm run desktop:prepare && electron-builder --linux AppImage --publish never",
+    "desktop:build:win": "npm run desktop:prepare && electron-builder --win nsis --x64 --publish never"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "ai.apolloflow.desktop",
+    "productName": "Apollo-Flow",
+    "copyright": "Apollo-Flow",
+    "afterPack": "scripts/after-pack.js",
+    "files": [
+      "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": [
+          "**/*",
+          "**/.*",
+          "**/.*/**"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist-desktop",
+      "buildResources": "build-assets"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build-assets/icon.ico",
+      "artifactName": "Apollo-Flow-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build-assets/icon.png",
+      "category": "Development",
+      "artifactName": "Apollo-Flow-${version}.${ext}"
+    }
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -49,6 +102,8 @@
     "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "42.4.1",
+    "electron-builder": "26.15.4",
     "eslint": "^9",
     "eslint-config-next": "15.5.19",
     "prisma": "^6.19.3",

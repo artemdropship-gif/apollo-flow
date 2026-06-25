@@ -1,0 +1,52 @@
+name: Build Windows desktop app
+
+# Builds the Apollo-Flow Windows installer (.exe) on a real Windows runner so
+# the Electron binaries and the Prisma Windows query engine are correct.
+# Trigger manually (Actions tab → Run workflow), on a version tag, or when the
+# desktop shell / build config changes.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+    paths:
+      - "electron/**"
+      - "scripts/desktop-prepare.js"
+      - "package.json"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop installer (.exe)
+        # Placeholder build-time env: the app's pages are dynamic and read real
+        # credentials at runtime (per-user config on first launch), so these are
+        # only here to satisfy any module that reads env during `next build`.
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          BETTER_AUTH_SECRET: "ci-build-placeholder-secret-not-used-at-runtime"
+          OPENROUTER_API_KEY: ""
+          # electron-builder: do not attempt code signing.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run desktop:build:win
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apollo-Flow-Windows-Setup
+          path: |
+            dist-desktop/*.exe
+          if-no-files-found: error

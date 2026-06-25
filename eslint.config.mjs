@@ -17,7 +17,12 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "build/**",
+      "dist-desktop/**",
       "next-env.d.ts",
+      // Electron main/preload and the desktop build script are CommonJS Node
+      // modules (run outside the Next bundle) and intentionally use require().
+      "electron/**",
+      "scripts/**",
     ],
   },
 ];

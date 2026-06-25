@@ -1,5 +1,9 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" covers the current build host (Linux here / Windows on CI);
+  // "windows" is bundled explicitly so the desktop .exe ships the Windows
+  // query engine and the database works without errors on Windows.
+  binaryTargets = ["native", "windows"]
 }
 
 datasource db {
