@@ -22,7 +22,7 @@ export const BLOCKS: BlockMeta[] = [
   { type: "backend", label: "Backend", color: "#22c55e", hint: "Server Actions / API Routes" },
   { type: "api", label: "API", color: "#06b6d4", hint: "REST / интеграционный слой" },
   { type: "database", label: "База данных", color: "#a855f7", hint: "PostgreSQL (Neon) + Prisma" },
-  { type: "ai", label: "AI", color: "#f59e0b", hint: "OpenRouter (free) + Vercel AI SDK" },
+  { type: "ai", label: "AI", color: "#f59e0b", hint: "Claude (Anthropic API) + Vercel AI SDK" },
   { type: "auth", label: "Auth", color: "#ef4444", hint: "Better Auth" },
   { type: "payments", label: "Платежи", color: "#ec4899", hint: "Stripe / ЮKassa (по команде)" },
   { type: "storage", label: "Хранилище", color: "#14b8a6", hint: "Vercel Blob" },

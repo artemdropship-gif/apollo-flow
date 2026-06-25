@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { chatStream, type ChatMessage } from "@/lib/ai/openrouter";
+import { chatStream, type ChatMessage } from "@/lib/ai/anthropic";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/features/assistant/prompt";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       if (!any) {
         controller.enqueue(
           encoder.encode(
-            "Архитектор, сейчас не получается связаться с моделью (возможно, лимит бесплатной модели). Попробуйте ещё раз через несколько секунд.",
+            "Архитектор, сейчас не получается связаться с моделью. Попробуйте ещё раз через несколько секунд.",
           ),
         );
       }

@@ -12,6 +12,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -35,7 +38,7 @@ jobs:
         env:
           DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
           BETTER_AUTH_SECRET: "ci-build-placeholder-secret-not-used-at-runtime"
-          OPENROUTER_API_KEY: ""
+          ANTHROPIC_AUTH_TOKEN: ""
           # electron-builder: do not attempt code signing.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run desktop:build:win
@@ -47,3 +50,14 @@ jobs:
           path: |
             dist-desktop/*.exe
           if-no-files-found: error
+
+      # On a version tag, publish a GitHub Release with the .exe attached so it
+      # has a permanent, directly-downloadable URL (no login required).
+      - name: Publish release with installer
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-desktop/*.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

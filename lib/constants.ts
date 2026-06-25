@@ -5,6 +5,7 @@ import {
   KanbanSquare,
   Workflow,
   FolderLock,
+  FolderKanban,
   NotebookPen,
   Settings,
   type LucideIcon,
@@ -20,6 +21,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, shortcut: "D" },
   { title: "Leads Finder", href: "/leads", icon: Search, shortcut: "L" },
+  { title: "Проекты", href: "/projects", icon: FolderKanban, shortcut: "J" },
   { title: "CRM Pipeline", href: "/pipeline", icon: KanbanSquare, shortcut: "P" },
   { title: "Workflow Builder", href: "/workflow", icon: Workflow, shortcut: "W" },
   { title: "Project Vault", href: "/vault", icon: FolderLock, shortcut: "V" },
@@ -48,6 +50,31 @@ export const NICHES: string[] = [
   "Отель",
   "SPA",
   "Магазин одежды",
+];
+
+export const CITIES: string[] = [
+  "Москва",
+  "Санкт-Петербург",
+  "Новосибирск",
+  "Екатеринбург",
+  "Казань",
+  "Нижний Новгород",
+  "Челябинск",
+  "Самара",
+  "Уфа",
+  "Ростов-на-Дону",
+  "Краснодар",
+  "Омск",
+  "Воронеж",
+  "Пермь",
+  "Волгоград",
+  "Саратов",
+  "Тюмень",
+  "Тольятти",
+  "Ижевск",
+  "Барнаул",
+  "Саранск",
+  "Сочи",
 ];
 
 export interface LeadStatusMeta {

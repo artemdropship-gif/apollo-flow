@@ -1,20 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  Check,
-  Globe,
-  Loader2,
-  MapPin,
-  Phone,
-  Plus,
-  Mail,
-} from "lucide-react";
+import { Check, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { saveLead } from "@/features/leads/actions";
+import { ContactLinks } from "@/features/leads/components/contact-links";
 import { ScoreBadge } from "@/features/leads/components/score-badge";
 import { TemperatureBadge } from "@/features/leads/components/temperature-badge";
 import type { LeadCandidate } from "@/features/leads/types";
@@ -47,6 +40,7 @@ export function ResultCard({ candidate }: { candidate: LeadCandidate }) {
             <h3 className="truncate font-semibold">{candidate.name}</h3>
             <p className="text-xs text-muted-foreground">
               {candidate.websiteStatus}
+              {candidate.isChain && " · сеть"}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -59,39 +53,13 @@ export function ResultCard({ candidate }: { candidate: LeadCandidate }) {
           </div>
         </div>
 
-        <div className="space-y-1 text-sm text-muted-foreground">
-          {candidate.address && (
-            <p className="flex items-center gap-2">
-              <MapPin className="size-3.5 shrink-0" />
-              <span className="truncate">{candidate.address}</span>
-            </p>
-          )}
-          {candidate.phone && (
-            <p className="flex items-center gap-2">
-              <Phone className="size-3.5 shrink-0" />
-              {candidate.phone}
-            </p>
-          )}
-          {candidate.email && (
-            <p className="flex items-center gap-2">
-              <Mail className="size-3.5 shrink-0" />
-              <span className="truncate">{candidate.email}</span>
-            </p>
-          )}
-          {candidate.website && (
-            <p className="flex items-center gap-2">
-              <Globe className="size-3.5 shrink-0" />
-              <a
-                href={candidate.website}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate text-primary hover:underline"
-              >
-                {candidate.website.replace(/^https?:\/\//, "")}
-              </a>
-            </p>
-          )}
-        </div>
+        <ContactLinks
+          address={candidate.address}
+          phone={candidate.phone}
+          email={candidate.email}
+          website={candidate.website}
+          socials={candidate.socials}
+        />
 
         {reasons.length > 0 && (
           <div className="flex flex-wrap gap-1.5">

@@ -1,3 +1,12 @@
+export interface LeadSocials {
+  telegram?: string;
+  whatsapp?: string;
+  instagram?: string;
+  vk?: string;
+  facebook?: string;
+  youtube?: string;
+}
+
 export interface RawBusiness {
   name: string;
   address: string | null;
@@ -5,6 +14,9 @@ export interface RawBusiness {
   email: string | null;
   website: string | null;
   workingHours: string | null;
+  socials: LeadSocials;
+  /** True when OSM marks this POI as part of a brand/chain. */
+  isChain: boolean;
   lat: number | null;
   lng: number | null;
   source: string;
@@ -36,7 +48,104 @@ const NICHE_FILTERS: Record<string, string[]> = {
   отель: ['"tourism"="hotel"'],
   spa: ['"leisure"="spa"', '"shop"="beauty"'],
   "магазин одежды": ['"shop"="clothes"'],
+  бар: ['"amenity"="bar"', '"amenity"="pub"'],
+  пекарня: ['"shop"="bakery"', '"craft"="bakery"'],
+  кондитерская: ['"shop"="confectionery"', '"shop"="pastry"'],
+  аптека: ['"amenity"="pharmacy"', '"healthcare"="pharmacy"'],
+  автомойка: ['"amenity"="car_wash"'],
+  шиномонтаж: ['"shop"="tyres"', '"shop"="car_repair"'],
+  ветклиника: ['"amenity"="veterinary"', '"healthcare"="veterinary"'],
+  массаж: ['"shop"="massage"', '"leisure"="spa"'],
+  тату: ['"shop"="tattoo"'],
 };
+
+/**
+ * Maps common natural-language niche words (synonyms, singular/plural,
+ * professions) to a canonical key in NICHE_FILTERS, so users get real tag-based
+ * results instead of the slow, usually-empty fuzzy name fallback.
+ */
+const NICHE_SYNONYMS: Record<string, string> = {
+  кофейня: "кафе",
+  кофейни: "кафе",
+  кофе: "кафе",
+  кафетерий: "кафе",
+  столовая: "кафе",
+  бистро: "кафе",
+  рестораны: "ресторан",
+  ресторанчик: "ресторан",
+  пиццерии: "пиццерия",
+  пицца: "пиццерия",
+  стоматолог: "стоматология",
+  "стоматологическая клиника": "стоматология",
+  "зубная клиника": "стоматология",
+  дантист: "стоматология",
+  парикмахерская: "барбершоп",
+  парикмахер: "барбершоп",
+  барбер: "барбершоп",
+  "ногтевая студия": "маникюрный салон",
+  маникюр: "маникюрный салон",
+  "салон ногтей": "маникюрный салон",
+  "ногтевой сервис": "маникюрный салон",
+  косметолог: "косметология",
+  "косметологическая клиника": "косметология",
+  "салон спа": "spa",
+  спа: "spa",
+  "спа салон": "spa",
+  фитнес: "фитнес клуб",
+  "тренажерный зал": "фитнес клуб",
+  "спортзал": "фитнес клуб",
+  зал: "фитнес клуб",
+  юристы: "юрист",
+  адвокат: "юрист",
+  "юридическая компания": "юрист",
+  "юридическая фирма": "юрист",
+  "агентство недвижимости": "недвижимость",
+  риелтор: "недвижимость",
+  риэлтор: "недвижимость",
+  клиника: "частная клиника",
+  "медицинский центр": "частная клиника",
+  "медцентр": "частная клиника",
+  гостиница: "отель",
+  хостел: "отель",
+  "магазин цветов": "цветочный магазин",
+  цветы: "цветочный магазин",
+  флорист: "цветочный магазин",
+  "автомастерская": "автосервис",
+  "ремонт авто": "автосервис",
+  сто: "автосервис",
+  "магазин парфюмерии": "магазин духов",
+  парфюмерия: "магазин духов",
+  духи: "магазин духов",
+  "магазин косметики": "косметология",
+  "детский сад": "детский центр",
+  "развивающий центр": "детский центр",
+  "магазин одежда": "магазин одежды",
+  одежда: "магазин одежды",
+  бутик: "магазин одежды",
+  бары: "бар",
+  паб: "бар",
+  булочная: "пекарня",
+  ветеринар: "ветклиника",
+  "ветеринарная клиника": "ветклиника",
+  "тату салон": "тату",
+  "тату студия": "тату",
+};
+
+/** Resolves a free-form niche string to a canonical NICHE_FILTERS key, if any. */
+function resolveNicheKey(niche: string): string | null {
+  const key = niche.trim().toLowerCase().replace(/ё/g, "е");
+  if (!key) return null;
+  if (NICHE_FILTERS[key]) return key;
+  if (NICHE_SYNONYMS[key]) return NICHE_SYNONYMS[key];
+  // Substring match: e.g. "лучшая стоматология" -> "стоматология".
+  for (const k of Object.keys(NICHE_FILTERS)) {
+    if (key.includes(k)) return k;
+  }
+  for (const s of Object.keys(NICHE_SYNONYMS)) {
+    if (key.includes(s)) return NICHE_SYNONYMS[s];
+  }
+  return null;
+}
 
 interface GeoArea {
   areaId: number;
@@ -77,8 +186,8 @@ async function geocodeCity(city: string): Promise<GeoArea | null> {
 }
 
 function buildQuery(areaId: number, niche: string, limit: number): string {
-  const key = niche.trim().toLowerCase();
-  const filters = NICHE_FILTERS[key];
+  const key = resolveNicheKey(niche);
+  const filters = key ? NICHE_FILTERS[key] : undefined;
   let selectors: string[];
 
   if (filters && filters.length) {
@@ -120,6 +229,63 @@ function buildAddress(tags: Record<string, string>): string | null {
   return parts.length ? parts.join(", ") : null;
 }
 
+/** Picks the first present tag from a list of candidate keys. */
+function pick(tags: Record<string, string>, keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = tags[k];
+    if (v && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
+/** Turns a raw OSM contact value (handle or URL) into a usable URL. */
+function toUrl(raw: string, base: string, handlePrefix = ""): string {
+  const v = raw.trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  const handle = v.replace(/^@/, "").replace(/^\/+/, "");
+  return `${base}/${handlePrefix}${handle}`;
+}
+
+/** Extracts every social/contact channel OSM exposes for a POI. */
+function extractSocials(tags: Record<string, string>): LeadSocials {
+  const socials: LeadSocials = {};
+
+  const tg = pick(tags, ["contact:telegram", "telegram", "contact:tg"]);
+  if (tg) socials.telegram = toUrl(tg, "https://t.me");
+
+  const wa = pick(tags, ["contact:whatsapp", "whatsapp"]);
+  if (wa) {
+    const digits = wa.replace(/[^\d]/g, "");
+    socials.whatsapp = digits
+      ? `https://wa.me/${digits}`
+      : toUrl(wa, "https://wa.me");
+  }
+
+  const ig = pick(tags, ["contact:instagram", "instagram"]);
+  if (ig) socials.instagram = toUrl(ig, "https://instagram.com");
+
+  const vk = pick(tags, ["contact:vk", "contact:vkontakte", "vk"]);
+  if (vk) socials.vk = toUrl(vk, "https://vk.com");
+
+  const fb = pick(tags, ["contact:facebook", "facebook"]);
+  if (fb) socials.facebook = toUrl(fb, "https://facebook.com");
+
+  const yt = pick(tags, ["contact:youtube", "youtube"]);
+  if (yt) socials.youtube = toUrl(yt, "https://youtube.com");
+
+  return socials;
+}
+
+/** Detects whether a POI belongs to a brand/chain (to deprioritise). */
+function detectChain(tags: Record<string, string>): boolean {
+  return Boolean(
+    tags["brand"] ||
+      tags["brand:wikidata"] ||
+      tags["brand:wikipedia"] ||
+      tags["operator:wikidata"],
+  );
+}
+
 export async function searchBusinesses(params: {
   city: string;
   niche: string;
@@ -129,7 +295,7 @@ export async function searchBusinesses(params: {
   const area = await geocodeCity(params.city);
   if (!area) return { results: [], area: null };
 
-  const query = buildQuery(area.areaId, params.niche, limit * 2);
+  const query = buildQuery(area.areaId, params.niche, limit * 4);
   const res = await fetch(OVERPASS, {
     method: "POST",
     headers: {
@@ -157,16 +323,34 @@ export async function searchBusinesses(params: {
     results.push({
       name,
       address: buildAddress(tags),
-      phone: tags.phone || tags["contact:phone"] || null,
-      email: tags.email || tags["contact:email"] || null,
-      website: tags.website || tags["contact:website"] || tags.url || null,
+      phone:
+        pick(tags, ["phone", "contact:phone", "contact:mobile", "mobile"]) ??
+        null,
+      email: pick(tags, ["email", "contact:email"]) ?? null,
+      website:
+        pick(tags, ["website", "contact:website", "url", "contact:url"]) ??
+        null,
       workingHours: tags.opening_hours || null,
+      socials: extractSocials(tags),
+      isChain: detectChain(tags),
       lat,
       lng,
       source: "openstreetmap",
     });
-    if (results.length >= limit) break;
+    if (results.length >= limit * 2) break;
   }
 
-  return { results, area };
+  // Prefer independent businesses with richer contact data; push big chains down.
+  const contactScore = (b: RawBusiness) =>
+    (b.phone ? 1 : 0) +
+    (b.email ? 1 : 0) +
+    (b.website ? 1 : 0) +
+    Object.keys(b.socials).length;
+
+  results.sort((a, b) => {
+    if (a.isChain !== b.isChain) return a.isChain ? 1 : -1;
+    return contactScore(b) - contactScore(a);
+  });
+
+  return { results: results.slice(0, limit), area };
 }

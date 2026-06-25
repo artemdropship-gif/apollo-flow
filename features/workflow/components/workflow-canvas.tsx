@@ -16,14 +16,16 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ApolloCore } from "@/components/layout/apollo-core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BLOCKS, blockMeta } from "@/lib/workflow/blocks";
 import {
   addWorkflowNode,
+  augmentWorkflow,
   deleteWorkflowNode,
   saveWorkflowGraph,
   type WorkflowDetail,
@@ -109,6 +111,8 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [augmentText, setAugmentText] = useState("");
+  const [augmenting, setAugmenting] = useState(false);
   const [, forceRender] = useState(0);
   const [brief, setBrief] = useState<Brief>({
     description: workflow.description ?? "",
@@ -161,6 +165,45 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
     setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
     delete metaRef.current[id];
     setSelectedId(null);
+  }
+
+  async function onAugment() {
+    const instruction = augmentText.trim();
+    if (!instruction || augmenting) return;
+    setAugmenting(true);
+    try {
+      const res = await augmentWorkflow({ id: workflow.id, instruction });
+      if (!res.ok) {
+        toast.error(res.error ?? "Не удалось дополнить");
+        return;
+      }
+      if (!res.added) {
+        toast.info("Аполлон считает, что добавлять нечего — структура уже полная.");
+        return;
+      }
+      for (const n of res.nodes ?? []) {
+        metaRef.current[n.id] = {
+          description: n.description,
+          tech: n.tech,
+          notes: n.notes,
+          tasks: n.tasks,
+        };
+      }
+      setNodes((nds) => [...nds, ...(res.nodes ?? []).map(toFlowNode)]);
+      setEdges((eds) => [
+        ...eds,
+        ...(res.edges ?? []).map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          animated: true,
+        })),
+      ]);
+      setAugmentText("");
+      toast.success(`Аполлон дополнил воркфлоу: +${res.added} блок(ов)`);
+    } finally {
+      setAugmenting(false);
+    }
   }
 
   async function onSave() {
@@ -310,6 +353,29 @@ function Canvas({ workflow }: { workflow: WorkflowDetail }) {
           </div>
         ) : (
           <div className="flex-1 space-y-3 overflow-y-auto p-3">
+            <div className="space-y-2 rounded-md border border-border bg-background/60 p-2">
+              <div className="flex items-center gap-1.5">
+                <ApolloCore className="size-4" />
+                <p className="text-[10px] uppercase text-muted-foreground">
+                  Дополнить через ИИ
+                </p>
+              </div>
+              <Textarea
+                value={augmentText}
+                onChange={(e) => setAugmentText(e.target.value)}
+                placeholder="Напр.: добавь оплату подпиской и аналитику. Аполлон дополнит схему, не ломая текущие блоки."
+                className="min-h-16 font-mono text-xs"
+              />
+              <Button
+                size="sm"
+                onClick={onAugment}
+                disabled={augmenting || !augmentText.trim()}
+                className="w-full"
+              >
+                <Sparkles className="size-3.5" />
+                {augmenting ? "Дополняю…" : "Дополнить воркфлоу"}
+              </Button>
+            </div>
             <div className="space-y-2 rounded-md border border-border bg-background/60 p-2">
               <p className="text-[10px] uppercase text-muted-foreground">ТЗ проекта</p>
               <div className="space-y-1">
